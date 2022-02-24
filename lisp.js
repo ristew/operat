@@ -11,7 +11,6 @@
 import util from 'util';
 import { readFileSync } from 'fs';
 
-let ufn = Function('l', 'return this.car(l) * 2;');
 let shouldDebug = false;
 class Symbol {
   constructor(s) {
@@ -27,16 +26,6 @@ class Symbol {
 class Applicative {
   constructor(fn) {
     this.fn = fn;
-  }
-}
-
-class Operative {
-  constructor(fn) {
-    this.fn = fn;
-  }
-
-  apply(env, args) {
-    this.fn.apply(env, env.mapeval(args));
   }
 }
 
@@ -135,7 +124,11 @@ const newenv = () => ({
     }
   },
 
-  $vau(args, body, hygenic = false) {
+  concat(...args) {
+    return args.join('');
+  },
+
+  $vau(args, body) {
     this.$debug('vau', args, body);
     return (...passedArgs) => {
       let i = 0;
