@@ -79,8 +79,7 @@ const newenv = () => ({
   },
 
   childenv() {
-    let env = newenv();
-    env.parentEnv = this;
+    let env = new Proxy(this, {});
     return env;
   },
 
@@ -107,8 +106,6 @@ const newenv = () => ({
     }
     return res;
   },
-
-  parentEnv: null,
 
   $define(symbol, value) {
     let val = this.$eval(value);
@@ -160,7 +157,7 @@ const newenv = () => ({
       this.$debug('call', this.$car(form));
       return this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
     } else if (this.symbolp(form)) {
-      return this.findSymbol(form);
+      return this[form.name];
     } else {
       return form;
     }
@@ -189,13 +186,13 @@ const newenv = () => ({
   operativep: c => c instanceof Function && (!c.name || c.name[0] === '$'),
   applicativep: c => c instanceof Applicative || (c instanceof Function && c.name[0] !== '$'),
 
-  findSymbol(symbol) {
-    this.$debug('findSymbol', symbol);
+  find(symbol) {
+    this.$debug('find', symbol);
     if (this.hasOwnProperty(symbol.name)) {
       return this[symbol.name];
     } else if (this.parentEnv) {
       this.$debug('find up', symbol);
-      return this.parentEnv.findSymbol(symbol);
+      return this.parentEnv.find(symbol);
     } else {
       throw new Error(`undefined symbol ${symbol.name}`);
     }
