@@ -9,6 +9,8 @@
  * applicatives are normal, operatives start with $
  */
 import util from 'util';
+import * as readline from 'readline';
+import process from 'process';
 import { readFileSync } from 'fs';
 
 let shouldDebug = false;
@@ -78,8 +80,21 @@ const newenv = () => ({
     return new Applicative(combiner);
   },
 
-  childenv() {
-    let env = new Proxy(this, {});
+  childenv(hygenic) {
+    let env = new Proxy(this, {
+      get(obj, p) {
+        return obj[p];
+      },
+
+      set(obj, p, val) {
+        if (!hygenic && obj.parentEnv) {
+          obj.parentEnv[p] = val;
+        } else {
+          obj[p] = val;
+        }
+        return true;
+      }
+    });
     return env;
   },
 
@@ -128,8 +143,9 @@ const newenv = () => ({
   $vau(args, body) {
     this.$debug('vau', args, body);
     return (...passedArgs) => {
+      this.$debug('call vau', args, passedArgs);
       let i = 0;
-      let lambdaEnv = this.childenv();
+      let lambdaEnv = this.childenv(false);
       for (let argName of args) {
         lambdaEnv[argName.name] = passedArgs[i];
         this.$debug('vauarg', argName, lambdaEnv[argName.name]);
@@ -171,7 +187,7 @@ const newenv = () => ({
       this.$debug('combine applicative', c);
       return this.$combine(this.$unwrap(c), this.$mapeval(ops));
     } else {
-      throw new Error(`cannot combine ${c}`);
+      throw new Error(`cannot combine ${JSON.stringify(c)}, ${JSON.stringify(ops)}`);
     }
   },
 
@@ -204,7 +220,7 @@ const newenv = () => ({
     while (this.toks.length > 0) {
       p.push(this.read_tokens());
     }
-    return p;
+    return p.length === 1 ? p[0] : p;
   },
 
   read_tokens() {
@@ -231,7 +247,7 @@ const newenv = () => ({
   },
 
   mapcar(l, fn) {
-    this.$debug(l, fn);
+    this.$debug('mapcar', l, fn);
     return l.map(e => this.$call('apply', fn, l));
   },
 
@@ -241,7 +257,7 @@ const newenv = () => ({
   },
 
   apply(fn, args) {
-    let fnenv = this.childenv();
+    let fnenv = this.childenv(true);
     return fn.apply(fnenv, args);
   },
 
@@ -277,11 +293,35 @@ const newenv = () => ({
 
 const example = readFileSync('./compiler.jsser').toString();
 
-let env = newenv();
+export let env = newenv();
 
-env.$log(env.$parse(example));
 try {
-  env.$log('eval to', env.$progn.apply(env, env.$parse(example)));
+  env.$log('loading lisp base');
+  env.$progn.apply(env, env.$parse(example));
 } catch (e) {
   console.log(e);
+  process.exit(1);
 }
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+async function repl() {
+  rl.question('>', answer => {
+    try {
+      env.$log(env.$eval(env.$parse(answer)));
+      repl();
+    } catch (e) {
+      env.$log(e);
+      repl();
+    }
+  })
+}
+
+async function main() {
+    repl();
+}
+
+main();

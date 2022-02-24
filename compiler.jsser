@@ -2,9 +2,15 @@
   ($vau (args body)
     (wrap (eval (list ($qt $vau) args body)))))
 
-($define fact
-  ($lambda (n)
-    ($if (eq n 0)
-        1
-      (* n (fact (- n 1))))))
-(fact 100)
+($define $macro
+         ($vau (name args body)
+               (eval (list ($qt $define) name (eval (list ($qt $vau) args body))))))
+
+($macro $function (name args body)
+    (eval (list ($qt $define) name (eval (list ($qt $lambda) args body)))))
+
+
+($function fact (n)
+        ($if (eq n 0)
+             1
+             (* n (fact (- n 1)))))
