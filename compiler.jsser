@@ -1,0 +1,10 @@
+($define $lambda
+  ($vau (args body)
+    (wrap (eval (list ($qt $vau) args body)))))
+
+($define fact
+  ($lambda (n)
+    ($if (eq n 0)
+        1
+      (* n (fact (- n 1))))))
+(fact 10)

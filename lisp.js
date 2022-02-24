@@ -5,13 +5,44 @@
  * - has to handle exceptions
  * - numeric type equivalence
  * - dicts a plenty
+ * trying to make fexprs work a la kernel
+ * applicatives are normal, operatives start with $
  */
+import util from 'util';
+import { readFileSync } from 'fs';
 
 let ufn = Function('l', 'return this.car(l) * 2;');
 let shouldDebug = false;
+class Symbol {
+  constructor(s) {
+    this.name = s;
+  }
+  [util.inspect.custom](depth, opts) {
+    return '`' + this.name + '`';
+  }
+
+
+}
+
+class Applicative {
+  constructor(fn) {
+    this.fn = fn;
+  }
+}
+
+class Operative {
+  constructor(fn) {
+    this.fn = fn;
+  }
+
+  apply(env, args) {
+    this.fn.apply(env, env.mapeval(args));
+  }
+}
+
 const newenv = () => ({
   cons(a, b) {
-    this.debug('cons', a, b);
+    this.$debug('cons', a, b);
     if (Array.isArray(b)) {
       return [a, ...b];
     } else {
@@ -28,112 +59,175 @@ const newenv = () => ({
     return l[0];
   },
 
+  $car(l) {
+    return l[0];
+  },
+
   cdr(l) {
     return l.slice(1);
   },
 
-  define(symbol, value) {
-    this[symbol] = value;
+  $cdr(l) {
+    return l.slice(1);
   },
 
-  compile(form) {
+  compile(form, env) {
 
   },
 
-  log() {
-    let msg = [];
-    for (var i = 0; i < arguments.length; i++) {
-      msg.push(arguments[i]);
-    }
-    console.log.apply(this, msg);
+  $log(...args) {
+    console.log.apply(this, args);
   },
 
-  debug() {
+  $debug(...args) {
     if (shouldDebug) {
-      this.log.apply(this, arguments);
+      this.$log.apply(this, args);
     }
   },
 
-  eq: (a, b) => a === b,
+  wrap(combiner) {
+    return new Applicative(combiner);
+  },
+
+  childenv() {
+    let env = newenv();
+    env.parentEnv = this;
+    return env;
+  },
+
+  eq(a, b) {
+    if (this.numberp(a)) {
+      return a === b
+    } else if (this.symbolp(a) && this.symbolp(b)) {
+      return a.name === b.name;
+    } else if (Array.isArray(a) && Array.isArray(b)) {
+      return a.length === 0 && b.length === 0;
+    } else {
+      return false;
+    }
+  },
+
+  caris(form, name) {
+    return this.eq(this.car(form), new Symbol(name));
+  },
+
+  $progn(...args) {
+    let res;
+    for (let statement of args) {
+      res = this.$eval(statement);
+    }
+    return res;
+  },
 
   parentEnv: null,
 
-  eval(form) {
-    this.debug('eval', form);
-    if (this.parentEnv) {
-      this.debug('child');
-    }
-    if (Array.isArray(form)) {
-      if (this.eq(this.car(form), 'define')) {
-        const [_, name, value] = form;
-        return this[name] = this.eval(value);
-      } else if (this.eq(this.car(form), 'if')) {
-        const [_, cond, then, elsse] = form;
-        this.debug('if', cond, then, elsse);
-        if (this.eval(cond)) {
-          return this.eval(then);
-        } else {
-          return this.eval(elsse);
-        }
-      } else if (this.eq(this.car(form), 'lambda')) {
-        const [_, args, body] = form;
-        this.debug('lambda', args);
-        return (...passedArgs) => {
-          this.debug('lamba call', body);
-          let i = 0;
-          let lambdaEnv = newenv();
-          lambdaEnv.parentEnv = this;
-          for (let argName of args) {
-            lambdaEnv[argName] = this.eval(passedArgs[i]);
-            i++;
-          }
-          return lambdaEnv.eval(body);
-        }
-      } else if (this.eq(this.car(form), 'progn')) {
-        let res;
-        for (let statement of this.cdr(form)) {
-          this.debug('progn', statement);
-          res = this.eval(statement);
-        }
-        return res;
-      } else {
-        let fn = this.findSymbol(this.car(form));
-        this.debug('fn', fn);
-        return fn.apply(this, this.cdr(form).map(e => this.eval(e)));
-      }
-    } else if (this.numberp(form)) {
-      return form;
+  $define(symbol, value) {
+    let val = this.$eval(value);
+    this.$debug('define', symbol, val);
+    this[symbol.name] = val;
+  },
+
+  $if(cond, then, elsse) {
+    if (this.$eval(cond)) {
+      return this.$eval(then);
     } else {
-      return this.findSymbol(form);
+      return this.$eval(elsse);
     }
   },
+
+  $vau(args, body, hygenic = false) {
+    this.$debug('vau', args, body);
+    return (...passedArgs) => {
+      let i = 0;
+      let lambdaEnv = this.childenv();
+      for (let argName of args) {
+        lambdaEnv[argName.name] = passedArgs[i];
+        this.$debug('vauarg', argName, lambdaEnv[argName.name]);
+        i++;
+      }
+      return lambdaEnv.$eval(body);
+    };
+  },
+
+  $qt(s) {
+    return s;
+  },
+
+  list(...args) {
+    return args;
+  },
+
+  eval(form) {
+    return this.$eval(form);
+  },
+
+  $eval(form) {
+    this.$debug('$eval', form);
+    if (Array.isArray(form)) {
+      this.$debug('call', this.$car(form));
+      return this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
+    } else if (this.symbolp(form)) {
+      return this.findSymbol(form);
+    } else {
+      return form;
+    }
+  },
+
+  $combine(c, ops) {
+    if (this.operativep(c)) {
+      this.$debug('combine operative', c, ops);
+      return c.apply(this, ops);
+    } else if (this.applicativep(c)) {
+      this.$debug('combine applicative', c);
+      return this.$combine(this.$unwrap(c), this.$mapeval(ops));
+    } else {
+      throw new Error(`cannot combine ${c}`);
+    }
+  },
+
+  $unwrap(c) {
+    if (c instanceof Applicative) {
+      return c.fn;
+    } else {
+      return (...args) => c.apply(this, (args));
+    }
+  },
+
+  operativep: c => c instanceof Function && (!c.name || c.name[0] === '$'),
+  applicativep: c => c instanceof Applicative || (c instanceof Function && c.name[0] !== '$'),
 
   findSymbol(symbol) {
-    if (this.hasOwnProperty(symbol)) {
-      return this[symbol];
+    this.$debug('findSymbol', symbol);
+    if (this.hasOwnProperty(symbol.name)) {
+      return this[symbol.name];
     } else if (this.parentEnv) {
-      this.debug('find up', symbol);
+      this.$debug('find up', symbol);
       return this.parentEnv.findSymbol(symbol);
     } else {
-      throw new Error(`undefined symbol ${symbol}`);
+      throw new Error(`undefined symbol ${symbol.name}`);
     }
   },
 
-  parse(s) {
-    return this.read_tokens(this.tokenize(s));
+  $parse(s) {
+    this.toks = this.tokenize(s);
+    let p = [];
+    while (this.toks.length > 0) {
+      p.push(this.read_tokens());
+    }
+    return p;
   },
 
-  read_tokens(toks) {
-    if (toks.length == 0) {
+  read_tokens() {
+    if (this.toks.length == 0) {
       throw new Error('unexpected EOF');
     }
-    let token = toks.shift();
+    let token = this.toks.shift();
     if (token === '(') {
       let sexp = [];
-      while (toks[0] !== ')') {
-        sexp.push(this.read_tokens(toks));
+      while (this.toks[0] !== ')') {
+        sexp.push(this.read_tokens(this.toks));
       }
-      toks.shift();
+      this.toks.shift();
       return sexp;
     } else if (token === ')') {
       throw new Error('unexpected )');
@@ -142,32 +236,62 @@ const newenv = () => ({
     }
   },
 
+  $call(name, ...args) {
+    return this.$eval([new Symbol(name), ...args]);
+  },
+
+  mapcar(l, fn) {
+    this.$debug(l, fn);
+    return l.map(e => this.$call('apply', fn, l));
+  },
+
+  $mapeval(l) {
+    this.$debug('$mapeval', l);
+    return l.map(e => this.$eval(e));
+  },
+
+  apply(fn, args) {
+    let fnenv = this.childenv();
+    return fn.apply(fnenv, args);
+  },
+
   atom(s) {
     let float = Number.parseFloat(s);
     if (!isNaN(float)) {
       return float;
     }
-    return s;
+    return new Symbol(s);
   },
 
   numberp: s => typeof s === 'number',
 
+  symbolp(s) {
+    return s instanceof Symbol;
+  },
+
+  functionp(f) {
+    return typeof f === 'function';
+  },
+
   tokenize(s) {
-    return s.replace(/\n/g, '').replace(/\(/g, ' (  ').replace(/\)/g, ' ) ').split(' ').filter(t => t.length > 0);
+    return s
+      .replace(/;.*\n/g, '')
+      .replace(/\n/g, '')
+      .replace(/\(/g, ' (  ')
+      .replace(/\)/g, ' ) ')
+      .split(' ')
+      .filter(t => t.length > 0);
   }
 });
 
-const example = `
-(progn
-    (define fact (lambda (n)
-      (if (eq n 0)
-        1
-        (* n (fact (- n 1))))))
-    (fact 100)
-)
-`;
+
+const example = readFileSync('./compiler.jsser').toString();
 
 let env = newenv();
 
-env.log(env.parse(example));
-env.log('eval to', env.eval(env.parse(example)));
+env.$log(env.$parse(example));
+try {
+  env.$log('eval to', env.$progn.apply(env, env.$parse(example)));
+} catch (e) {
+  console.log(e);
+}
