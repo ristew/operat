@@ -65,10 +65,6 @@ const newenv = () => ({
     return l.slice(1);
   },
 
-  compile(form, env) {
-
-  },
-
   $log(...args) {
     console.log(...args);
   },
@@ -123,10 +119,14 @@ const newenv = () => ({
       },
 
       set(obj, p, val) {
+        if (typeof p !== 'string') {
+          throw new Error(`set non-string in env ${p}`)
+        }
         obj[p] = val;
         return true;
       }
     });
+    this.$debug('childenv', env.level);
     return env;
   },
 
@@ -168,11 +168,12 @@ const newenv = () => ({
 
   $set(symbol, value) {
     if (this.parent && !this.hygenic) {
+      this.$log('$set up', symbol, '=', value, this.hygenic, this.level);
       this.parent.$set(symbol, value);
     } else {
+      this.$log('$set', symbol, value, this.hygenic, this.level);
       this[symbol.name] = value;
     }
-    this.$debug('$set', symbol, value, this);
     return value;
   },
 
@@ -197,24 +198,49 @@ const newenv = () => ({
     return args.join('');
   },
 
-  $vau(args, body) {
+  $uvau(args, body) {
+    return this.$vau(args, body, false);
+  },
+
+  $vau(args, body, hygenic = true) {
+    let target = body;
     this.$debug('vau', args, body);
+    if (this.$compile) {
+      target = this.$compile(body);
+    }
+    let closure = this;
     return (...passedArgs) => {
       this.$debug('call vau', args, passedArgs);
-      let lambdaEnv = this.$childenv();
+      let lambdaEnv = closure.$childenv();
+      lambdaEnv.hygenic = hygenic;
       for (let i = 0; i < args.length; i++) {
-        let argName = args[i];
-        if (argName.name.indexOf('...') === 0) {
-          let spreadName = argName.name.slice(3);
-          lambdaEnv[spreadName] = passedArgs.slice(i);
-          this.$debug('vauarg spread', spreadName, lambdaEnv[spreadName]);
-          break;
+        let arg = args[i];
+        if (this.$caris(arg, 'rest')) {
+          this.$log('rest', arg);
+          let spread = this.$listp(arg) ? arg[1] : arg;
+          const remaining = args.length - i - 1;
+          lambdaEnv.$set(spread, passedArgs.slice(i, passedArgs.length - remaining));
+          if (remaining === 1) {
+            i++;
+            lambdaEnv.$set(args[i], passedArgs[passedArgs.length - 1]);
+          } else if (remaining > 1) {
+            throw new Error(`more than one remaining for spread ${args}`);
+          }
+          this.$debug('vauarg spread', spread.name, lambdaEnv[spread.name]);
+        } else {
+          lambdaEnv.$set(arg, passedArgs[i]);
+          this.$debug('vauarg', arg, lambdaEnv[arg.name]);
         }
-        lambdaEnv[argName.name] = passedArgs[i];
-        this.$debug('vauarg', argName, lambdaEnv[argName.name]);
       }
-      return lambdaEnv.$eval(body);
+      console.log(lambdaEnv, target);
+      return lambdaEnv.$eval(target);
     };
+  },
+
+  $hygenicvau(args, body) {
+    let hygenv = this.$childenv();
+    hygenv.hygenic = true;
+    return hygenv.$vau(args, body);
   },
 
   $qt(s) {
@@ -248,7 +274,6 @@ const newenv = () => ({
       }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
-        this.$debug('undefined', this);
         throw new Error(`undefined ${form}`);
       }
       this.$debug('symbol', form, this[form.name]);
@@ -364,7 +389,7 @@ const newenv = () => ({
         toks.push(str);
       } else {
         let sym = '';
-        while (!' \n\t();"'.includes(s[i])) {
+        while (s[i] && /[^ \n\t();"]/.test(s[i])) {
           sym += s[i];
           i++;
         }
@@ -420,7 +445,7 @@ try {
 async function repl() {
   rl.question('%% ', answer => {
     try {
-      replEnv.$log(replEnv.$eval(replEnv.$parseToplevel(answer)));
+      replEnv.$log(replEnv.$eval(replEnv.$parseToplevel(answer)[0]));
       repl();
     } catch (e) {
       replEnv.$log(e);

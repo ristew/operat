@@ -1,18 +1,22 @@
 ($wrapapplicatives)
+($define $umacro
+  ($uvau (name args body)
+    (eval '$define name (list '$uvau args body))))
+
 ($define $macro
-  ($vau (name args body)
+  ($uvau (name args body)
     (eval '$define name (list '$vau args body))))
 
 ($macro $lambda (args body)
-  (wrap (eval '$vau args body)))
+  (wrap (eval '$uvau args body)))
 
-($macro $function (name args body)
+($umacro $function (name args body)
   (eval '$define name (list '$lambda args body)))
 
 ($function cadr (l) (car (cdr l)))
 
-($macro $defs (...bindings)
-  (eval '$mapcar bindings ($vau (binding) (eval '$define (car binding) (cadr binding)))))
+($umacro $defs ((rest bindings))
+  (mapcar bindings ($uvau (binding) (eval '$define (car binding) (cadr binding)))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -34,4 +38,21 @@
   (testno 100)
   (circ ($lambda (r) (* 2 (* pi r)))))
 
+($macro $let (cases inner)
+  ())
+;;
+;; ($macro $case (obj bindings)
+;;   ())
+;;
+;; ($macro $compile (form)
+;;   ())
+
 (log (fact (fib 10)))
+
+($function resty (first (rest middle) last)
+  (list last first middle))
+
+($function closure (n)
+  ($lambda (m) (* n m)))
+
+($define b (closure 6))
