@@ -221,8 +221,8 @@ const newenv = () => ({
     return s;
   },
 
-  eval(form) {
-    return this.$eval(form);
+  eval(...form) {
+    return this.$eval(...form);
   },
 
   $wrapapplicatives() {
@@ -234,12 +234,18 @@ const newenv = () => ({
     }
   },
 
-  $eval(form) {
+  $eval(...form) {
+    if (form.length === 1) {
+      form = form[0];
+    }
     this.$debug('$eval', form);
     if (Array.isArray(form)) {
       this.$debug('call', this.$car(form));
       return this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
     } else if (this.$symbolp(form)) {
+      if (form.name[0] === "'") {
+        return new Symbol(form.name.slice(1));
+      }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
         this.$debug('undefined', this);
@@ -259,6 +265,10 @@ const newenv = () => ({
     } else {
       throw new Error(`cannot combine ${JSON.stringify(c)}, ${JSON.stringify(ops)}`);
     }
+  },
+
+  list(...l) {
+    return l;
   },
 
   exit() {

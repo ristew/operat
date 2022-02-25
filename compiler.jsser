@@ -1,18 +1,18 @@
 ($wrapapplicatives)
 ($define $macro
   ($vau (name args body)
-    (eval (` $define (, name) (, (` $vau (, args) (, body)))))))
+    (eval '$define name (list '$vau args body))))
 
 ($macro $lambda (args body)
-  (wrap (eval (` $vau (, args) (, body)))))
+  (wrap (eval '$vau args body)))
 
 ($macro $function (name args body)
-  (eval (` $define (, name) (, (` $lambda (, args) (, body))))))
+  (eval '$define name (list '$lambda args body)))
 
 ($function cadr (l) (car (cdr l)))
 
 ($macro $defs (...bindings)
-  (eval (` $mapcar (, bindings) (, ($vau (binding) (eval (` $define (, (car binding)) (, (cadr binding)))))))))
+  (eval '$mapcar bindings ($vau (binding) (eval '$define (car binding) (cadr binding)))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -24,6 +24,7 @@
     1
     (* n (pow n (- p 1)))))
 
+;; the slow way!
 ($function fib (n)
   ($if (lt n 2)
     1
@@ -34,4 +35,4 @@
   (testno 100)
   (circ ($lambda (r) (* 2 (* pi r)))))
 
-(log (fib 15))
+(log (fact (fib 10)))
