@@ -29,7 +29,6 @@
   ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
-
 ($defs
   (pi 3.14)
   (testno 100)

@@ -275,31 +275,31 @@ const newenv = () => ({
     process.exit(0);
   },
 
-  $parse(s) {
-    this.toks = this.$tokenize(s);
+  $parseToplevel(s) {
+    let toks = this.$tokenize(s);
     let p = [];
-    while (this.toks.length > 0) {
-      p.push(this.$read_tokens());
+    while (toks.length > 0) {
+      p.push(this.$readTokens(toks));
     }
-    return p.length === 1 ? p[0] : p;
+    return p;
   },
 
-  $read_tokens() {
-    if (this.toks.length == 0) {
+  $readTokens(toks) {
+    if (toks.length == 0) {
       throw new Error('unexpected EOF');
     }
-    let token = this.toks.shift();
+    let token = toks.shift();
     if (token === '(') {
       let sexp = [];
-      while (this.toks[0] !== ')') {
-        sexp.push(this.$read_tokens(this.toks));
+      while (toks[0] !== ')') {
+        sexp.push(this.$readTokens(toks));
       }
-      this.toks.shift();
+      toks.shift();
       return sexp;
     } else if (token === ')') {
       throw new Error('unexpected )');
     } else {
-      return this.$atom(token);
+      return token;
     }
   },
 
@@ -327,10 +327,6 @@ const newenv = () => ({
   },
 
   $atom(s) {
-    let float = Number.parseFloat(s);
-    if (!isNaN(float)) {
-      return float;
-    }
     return new Symbol(s);
   },
 
@@ -349,13 +345,39 @@ const newenv = () => ({
   },
 
   $tokenize(s) {
-    return s
-      .replace(/;.*\n/g, '')
-      .replace(/\n/g, '')
-      .replace(/\(/g, ' (  ')
-      .replace(/\)/g, ' ) ')
-      .split(' ')
-      .filter(t => t.length > 0);
+    let toks = [];
+    for (let i = 0; i < s.length; i++) {
+      let c = s[i];
+      if ('()'.includes(c)) {
+        toks.push(c);
+      } else if (c === ';') {
+        while (s[i] !== '\n') {
+          i++;
+        }
+      } else if (' \n\t'.includes(c)) {
+      } else if (c === '"') {
+        i++;
+        let str = '';
+        while (s[i] !== '"') {
+          str += s[i];
+        }
+        toks.push(str);
+      } else {
+        let sym = '';
+        while (!' \n\t();"'.includes(s[i])) {
+          sym += s[i];
+          i++;
+        }
+        i--;
+        let float = Number.parseFloat(sym);
+        if (!isNaN(float)) {
+          toks.push(float);
+        } else {
+          toks.push(new Symbol(sym));
+        }
+      }
+    }
+    return toks;
   }
 });
 
@@ -389,7 +411,7 @@ let replEnv = env.$childenv(true);
 
 try {
   env.$log('loading lisp base');
-  env.$progn.apply(env, env.$parse(example));
+  env.$progn.apply(env, env.$parseToplevel(example));
 } catch (e) {
   console.log(e);
   repl();
@@ -398,7 +420,7 @@ try {
 async function repl() {
   rl.question('%% ', answer => {
     try {
-      replEnv.$log(replEnv.$eval(replEnv.$parse(answer)));
+      replEnv.$log(replEnv.$eval(replEnv.$parseToplevel(answer)));
       repl();
     } catch (e) {
       replEnv.$log(e);
