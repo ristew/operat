@@ -13,7 +13,6 @@ import * as readline from 'readline';
 import process from 'process';
 import { readFileSync } from 'fs';
 
-let shouldDebug = false;
 class Symbol {
   constructor(s) {
     this.name = s;
@@ -22,16 +21,17 @@ class Symbol {
     return '`' + this.name + '`';
   }
 
-
-}
-
-class Applicative {
-  constructor(fn) {
-    this.fn = fn;
+  toString() {
+    return '`' + this.name + '`';
   }
+
 }
 
 const newenv = () => ({
+  shouldDebug: false,
+  debug() {
+    this.shouldDebug = !this.shouldDebug;
+  },
   cons(a, b) {
     this.$debug('cons', a, b);
     if (Array.isArray(b)) {
@@ -39,6 +39,9 @@ const newenv = () => ({
     } else {
       return [a, b];
     }
+  },
+
+  $applicative: function(fn) {
   },
 
   '*': (a, b) => a * b,
@@ -67,31 +70,60 @@ const newenv = () => ({
   },
 
   $log(...args) {
-    console.log.apply(this, args);
+    console.log(...args);
+  },
+
+  log(...args) {
+    this.$log(...args);
   },
 
   $debug(...args) {
-    if (shouldDebug) {
+    if (this.shouldDebug) {
       this.$log.apply(this, args);
     }
   },
 
-  wrap(combiner) {
-    return new Applicative(combiner);
+  wrap(fn) {
+    return this.$wrap(fn);
   },
 
-  childenv(hygenic) {
-    let env = new Proxy(this, {
+  $wrap(fn) {
+    if (typeof fn !== 'function') {
+      throw new Error(`attempted to wrap a non-fn ${fn}`);
+    }
+    this.$debug('wrap', fn);
+    return function(...args) {
+      this.$debug('call wrapped fn', fn, args);
+      return fn.apply(this, this.$mapeval(args));
+    };
+  },
+
+  level: 0,
+
+  hygenic: false,
+
+  $childenv() {
+    let base = this;
+    let env = new Proxy({
+      parent: base,
+      level: base.level + 1,
+    }, {
       get(obj, p) {
-        return obj[p];
+        if (p in obj) {
+          return obj[p];
+        } else if (obj.parent) {
+          let lookup = obj.parent[p];
+          if (lookup instanceof Function) {
+            lookup.bind(env);
+          }
+          return lookup;
+        } else {
+          throw new Error(`undefined ${p}`);
+        }
       },
 
       set(obj, p, val) {
-        if (!hygenic && obj.parentEnv) {
-          obj.parentEnv[p] = val;
-        } else {
-          obj[p] = val;
-        }
+        obj[p] = val;
         return true;
       }
     });
@@ -99,19 +131,31 @@ const newenv = () => ({
   },
 
   eq(a, b) {
-    if (this.numberp(a)) {
+    return this.$eq(a, b);
+  },
+
+  gt(a, b) {
+    return a > b;
+  },
+
+  lt(a, b) {
+    return a < b;
+  },
+
+  $eq(a, b) {
+    if (this.$numberp(a)) {
       return a === b
-    } else if (this.symbolp(a) && this.symbolp(b)) {
+    } else if (this.$symbolp(a) && this.$symbolp(b)) {
       return a.name === b.name;
-    } else if (Array.isArray(a) && Array.isArray(b)) {
+    } else if (this.$listp(a) && this.$listp(b)) {
       return a.length === 0 && b.length === 0;
     } else {
       return false;
     }
   },
 
-  caris(form, name) {
-    return this.eq(this.car(form), new Symbol(name));
+  $caris(form, name) {
+    return this.$listp(form) && this.$eq(this.$car(form), new Symbol(name));
   },
 
   $progn(...args) {
@@ -122,10 +166,23 @@ const newenv = () => ({
     return res;
   },
 
+  $set(symbol, value) {
+    if (this.parent && !this.hygenic) {
+      this.parent.$set(symbol, value);
+    } else {
+      this[symbol.name] = value;
+    }
+    this.$debug('$set', symbol, value, this);
+    return value;
+  },
+
   $define(symbol, value) {
     let val = this.$eval(value);
     this.$debug('define', symbol, val);
-    this[symbol.name] = val;
+    if (typeof val === 'undefined') {
+      throw new Error(`attempt to define ${symbol} to undefined!`);
+    }
+    return this.$set(symbol, val);
   },
 
   $if(cond, then, elsse) {
@@ -144,12 +201,17 @@ const newenv = () => ({
     this.$debug('vau', args, body);
     return (...passedArgs) => {
       this.$debug('call vau', args, passedArgs);
-      let i = 0;
-      let lambdaEnv = this.childenv(false);
-      for (let argName of args) {
+      let lambdaEnv = this.$childenv();
+      for (let i = 0; i < args.length; i++) {
+        let argName = args[i];
+        if (argName.name.indexOf('...') === 0) {
+          let spreadName = argName.name.slice(3);
+          lambdaEnv[spreadName] = passedArgs.slice(i);
+          this.$debug('vauarg spread', spreadName, lambdaEnv[spreadName]);
+          break;
+        }
         lambdaEnv[argName.name] = passedArgs[i];
         this.$debug('vauarg', argName, lambdaEnv[argName.name]);
-        i++;
       }
       return lambdaEnv.$eval(body);
     };
@@ -159,12 +221,17 @@ const newenv = () => ({
     return s;
   },
 
-  list(...args) {
-    return args;
-  },
-
   eval(form) {
     return this.$eval(form);
+  },
+
+  $wrapapplicatives() {
+    for (let fname in this) {
+      const fn = this[fname];
+      if (typeof fn === 'function' && /[\w\*\/\+\-]/.test(fn.name[0])) {
+        this[fname] = this.$wrap(fn);
+      }
+    }
   },
 
   $eval(form) {
@@ -172,7 +239,13 @@ const newenv = () => ({
     if (Array.isArray(form)) {
       this.$debug('call', this.$car(form));
       return this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
-    } else if (this.symbolp(form)) {
+    } else if (this.$symbolp(form)) {
+      let sym = this[form.name];
+      if (typeof sym === 'undefined') {
+        this.$debug('undefined', this);
+        throw new Error(`undefined ${form}`);
+      }
+      this.$debug('symbol', form, this[form.name]);
       return this[form.name];
     } else {
       return form;
@@ -180,50 +253,28 @@ const newenv = () => ({
   },
 
   $combine(c, ops) {
-    if (this.operativep(c)) {
-      this.$debug('combine operative', c, ops);
+    this.$debug('combine', c, ops);
+    if (c instanceof Function) {
       return c.apply(this, ops);
-    } else if (this.applicativep(c)) {
-      this.$debug('combine applicative', c);
-      return this.$combine(this.$unwrap(c), this.$mapeval(ops));
     } else {
       throw new Error(`cannot combine ${JSON.stringify(c)}, ${JSON.stringify(ops)}`);
     }
   },
 
-  $unwrap(c) {
-    if (c instanceof Applicative) {
-      return c.fn;
-    } else {
-      return (...args) => c.apply(this, (args));
-    }
-  },
-
-  operativep: c => c instanceof Function && (!c.name || c.name[0] === '$'),
-  applicativep: c => c instanceof Applicative || (c instanceof Function && c.name[0] !== '$'),
-
-  find(symbol) {
-    this.$debug('find', symbol);
-    if (this.hasOwnProperty(symbol.name)) {
-      return this[symbol.name];
-    } else if (this.parentEnv) {
-      this.$debug('find up', symbol);
-      return this.parentEnv.find(symbol);
-    } else {
-      throw new Error(`undefined symbol ${symbol.name}`);
-    }
+  exit() {
+    process.exit(0);
   },
 
   $parse(s) {
-    this.toks = this.tokenize(s);
+    this.toks = this.$tokenize(s);
     let p = [];
     while (this.toks.length > 0) {
-      p.push(this.read_tokens());
+      p.push(this.$read_tokens());
     }
     return p.length === 1 ? p[0] : p;
   },
 
-  read_tokens() {
+  $read_tokens() {
     if (this.toks.length == 0) {
       throw new Error('unexpected EOF');
     }
@@ -231,14 +282,14 @@ const newenv = () => ({
     if (token === '(') {
       let sexp = [];
       while (this.toks[0] !== ')') {
-        sexp.push(this.read_tokens(this.toks));
+        sexp.push(this.$read_tokens(this.toks));
       }
       this.toks.shift();
       return sexp;
     } else if (token === ')') {
       throw new Error('unexpected )');
     } else {
-      return this.atom(token);
+      return this.$atom(token);
     }
   },
 
@@ -247,8 +298,12 @@ const newenv = () => ({
   },
 
   mapcar(l, fn) {
+    return this.$mapcar(l, fn);
+  },
+
+  $mapcar(l, fn) {
     this.$debug('mapcar', l, fn);
-    return l.map(e => this.$call('apply', fn, l));
+    return l.map(e => this.$combine(fn, [e]));
   },
 
   $mapeval(l) {
@@ -257,11 +312,11 @@ const newenv = () => ({
   },
 
   apply(fn, args) {
-    let fnenv = this.childenv(true);
+    let fnenv = this.$childenv(true);
     return fn.apply(fnenv, args);
   },
 
-  atom(s) {
+  $atom(s) {
     let float = Number.parseFloat(s);
     if (!isNaN(float)) {
       return float;
@@ -269,17 +324,21 @@ const newenv = () => ({
     return new Symbol(s);
   },
 
-  numberp: s => typeof s === 'number',
+  $numberp: s => typeof s === 'number',
 
-  symbolp(s) {
+  $symbolp(s) {
     return s instanceof Symbol;
   },
 
-  functionp(f) {
+  $listp(s) {
+    return Array.isArray(s);
+  },
+
+  $functionp(f) {
     return typeof f === 'function';
   },
 
-  tokenize(s) {
+  $tokenize(s) {
     return s
       .replace(/;.*\n/g, '')
       .replace(/\n/g, '')
@@ -294,34 +353,48 @@ const newenv = () => ({
 const example = readFileSync('./compiler.jsser').toString();
 
 export let env = newenv();
+env["'"] = function $qtlit(...args) {
+  return args;
+};
 
-try {
-  env.$log('loading lisp base');
-  env.$progn.apply(env, env.$parse(example));
-} catch (e) {
-  console.log(e);
-  process.exit(1);
-}
+env["`"] = function $qslit(...args) {
+  let res = this.$mapcar(args, arg => {
+    if (this.$caris(arg, ',')) {
+      return this.$eval(this.$car(this.$cdr(arg)));
+    } else {
+      return arg;
+    }
+  });
+
+  this.$debug('quasiquote', res);
+  return res;
+};
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
+let replEnv = env.$childenv(true);
+
+try {
+  env.$log('loading lisp base');
+  env.$progn.apply(env, env.$parse(example));
+} catch (e) {
+  console.log(e);
+  repl();
+}
+
 async function repl() {
-  rl.question('>', answer => {
+  rl.question('%% ', answer => {
     try {
-      env.$log(env.$eval(env.$parse(answer)));
+      replEnv.$log(replEnv.$eval(replEnv.$parse(answer)));
       repl();
     } catch (e) {
-      env.$log(e);
+      replEnv.$log(e);
       repl();
     }
   })
 }
 
-async function main() {
-    repl();
-}
-
-main();
+repl();

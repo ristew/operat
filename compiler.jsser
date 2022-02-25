@@ -1,16 +1,37 @@
-($define $lambda
-  ($vau (args body)
-    (wrap (eval (list ($qt $vau) args body)))))
-
+($wrapapplicatives)
 ($define $macro
-         ($vau (name args body)
-               (eval (list ($qt $define) name (eval (list ($qt $vau) args body))))))
+  ($vau (name args body)
+    (eval (` $define (, name) (, (` $vau (, args) (, body)))))))
+
+($macro $lambda (args body)
+  (wrap (eval (` $vau (, args) (, body)))))
 
 ($macro $function (name args body)
-    (eval (list ($qt $define) name (eval (list ($qt $lambda) args body)))))
+  (eval (` $define (, name) (, (` $lambda (, args) (, body))))))
 
+($function cadr (l) (car (cdr l)))
+
+($macro $defs (...bindings)
+  (eval (` $mapcar (, bindings) (, ($vau (binding) (eval (` $define (, (car binding)) (, (cadr binding)))))))))
 
 ($function fact (n)
-        ($if (eq n 0)
-             1
-             (* n (fact (- n 1)))))
+  ($if (eq n 0)
+    1
+    (* n (fact (- n 1)))))
+
+($function pow (n p)
+  ($if (eq p 0)
+    1
+    (* n (pow n (- p 1)))))
+
+($function fib (n)
+  ($if (lt n 2)
+    1
+    (+ (fib (- n 1)) (fib (- n 2)))))
+
+($defs
+  (pi 3.14)
+  (testno 100)
+  (circ ($lambda (r) (* 2 (* pi r)))))
+
+(log (fib 15))
