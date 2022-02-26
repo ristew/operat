@@ -24,7 +24,6 @@ class Symbol {
   toString() {
     return '`' + this.name + '`';
   }
-
 }
 
 const newenv = () => ({
@@ -32,16 +31,17 @@ const newenv = () => ({
   debug() {
     this.shouldDebug = !this.shouldDebug;
   },
+
   cons(a, b) {
-    this.$debug('cons', a, b);
+    return $cons(a, b);
+  },
+
+  $cons(a, b) {
     if (Array.isArray(b)) {
       return [a, ...b];
     } else {
       return [a, b];
     }
-  },
-
-  $applicative: function(fn) {
   },
 
   '*': (a, b) => a * b,
@@ -66,7 +66,8 @@ const newenv = () => ({
   },
 
   $log(...args) {
-    console.log(...args);
+    let printed = args.map(a => this.$print(a));
+    console.log(...printed);
   },
 
   log(...args) {
@@ -77,6 +78,54 @@ const newenv = () => ({
     if (this.shouldDebug) {
       this.$log.apply(this, args);
     }
+  },
+
+  $map(...bindings) {
+    let m = {};
+    for (let binding of bindings) {
+      let name = binding[0];
+      let value = binding[1];
+      m[name] = this.$eval(value);
+    }
+    return m;
+  },
+
+  $mapp(m) {
+    return typeof m === 'object';
+  },
+
+  $printlist(os){
+    return os.map(e => this.$print(e)).join(' ');
+  },
+
+  $print(o, pp = false) {
+    if (this.$symbolp(o)) {
+      return o.name;
+    } else if (this.$numberp(o)) {
+      return o;
+    } else if (this.$stringp(o)) {
+      return `"${o}"`;
+    } else if (this.$listp(o)) {
+      return `(${this.$printlist(o)})`;
+    } else if (this.$functionp(o)) {
+      if (o.name) {
+        return `$function ${o.name}`;
+      } else {
+        return `$vau`;
+      }
+    } else if (this.$mapp(o)) {
+      return `\n(map ${this.$printlist(Object.entries(o).map(([key, val]) => [new Symbol(key), val]))})\n`
+    } else if (this.$booleanp(o)) {
+      return o;
+    }
+  },
+
+  $booleanp(b) {
+    return typeof b === 'boolean';
+  },
+
+  $stringp(s) {
+    return typeof s === 'string';
   },
 
   wrap(fn) {
@@ -119,6 +168,9 @@ const newenv = () => ({
       },
 
       set(obj, p, val) {
+        if (p instanceof Symbol) {
+          p = p.name;
+        }
         if (typeof p !== 'string') {
           throw new Error(`set non-string in env ${p}`)
         }
@@ -219,21 +271,22 @@ const newenv = () => ({
           this.$log('rest', arg);
           let spread = this.$listp(arg) ? arg[1] : arg;
           const remaining = args.length - i - 1;
-          lambdaEnv.$set(spread, passedArgs.slice(i, passedArgs.length - remaining));
+          lambdaEnv[spread.name] = passedArgs.slice(i, passedArgs.length - remaining);
           if (remaining === 1) {
             i++;
-            lambdaEnv.$set(args[i], passedArgs[passedArgs.length - 1]);
+            lambdaEnv[args[i].name] = passedArgs[passedArgs.length - 1];
           } else if (remaining > 1) {
             throw new Error(`more than one remaining for spread ${args}`);
           }
           this.$debug('vauarg spread', spread.name, lambdaEnv[spread.name]);
         } else {
-          lambdaEnv.$set(arg, passedArgs[i]);
+          lambdaEnv[arg.name] = passedArgs[i];
           this.$debug('vauarg', arg, lambdaEnv[arg.name]);
         }
       }
-      console.log(lambdaEnv, target);
-      return lambdaEnv.$eval(target);
+      this.$debug(lambdaEnv);
+      let res = lambdaEnv.$eval(target);
+      return res;
     };
   },
 
@@ -337,7 +390,6 @@ const newenv = () => ({
   },
 
   $mapcar(l, fn) {
-    this.$debug('mapcar', l, fn);
     return l.map(e => this.$combine(fn, [e]));
   },
 

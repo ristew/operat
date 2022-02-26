@@ -1,4 +1,5 @@
 ($wrapapplicatives)
+(debug)
 ($define $umacro
   ($uvau (name args body)
     (eval '$define name (list '$uvau args body))))
