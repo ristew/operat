@@ -44,6 +44,7 @@ const newenv = () => ({
     }
   },
 
+
   '*': (a, b) => a * b,
   '/': (a, b) => a / b,
   '+': (a, b) => a + b,
@@ -90,6 +91,14 @@ const newenv = () => ({
     return m;
   },
 
+  $get(map, key) {
+    return map[key];
+  },
+
+  $set(map, key, val) {
+    return this.$eval(map)[key] = val;
+  },
+
   $mapp(m) {
     return typeof m === 'object';
   },
@@ -99,7 +108,9 @@ const newenv = () => ({
   },
 
   $print(o, pp = false) {
-    if (this.$symbolp(o)) {
+    if (o instanceof Error) {
+      return o.stack;
+    } else if (this.$symbolp(o)) {
       return o.name;
     } else if (this.$numberp(o)) {
       return o;
@@ -218,16 +229,27 @@ const newenv = () => ({
     return res;
   },
 
+  nativefib(n) {
+    //   ($if (lt n 2) 1 (+ (fib (- n 1)) (fib (- n 2))))
+    return (n < 2) ? (1) : (this.nativefib(n - 1) + this.nativefib(n - 2));
+  },
+
+  compiledfib: new Function('n', `
+    return (n < 2) ? (1) : (this.nativefib(n - 1) + this.nativefib(n - 2));
+`),
+
   $set(symbol, value) {
     if (this.parent && !this.hygenic) {
-      this.$log('$set up', symbol, '=', value, this.hygenic, this.level);
+      this.$debug('$set up', symbol, '=', value, this.hygenic, this.level);
       this.parent.$set(symbol, value);
     } else {
-      this.$log('$set', symbol, value, this.hygenic, this.level);
+      this.$debug('$set', symbol, value, this.hygenic, this.level);
       this[symbol.name] = value;
     }
     return value;
   },
+
+
 
   $define(symbol, value) {
     let val = this.$eval(value);
@@ -239,6 +261,7 @@ const newenv = () => ({
   },
 
   $if(cond, then, elsse) {
+    // ($if ($eval cond) ($eval then) ($eval else))
     if (this.$eval(cond)) {
       return this.$eval(then);
     } else {
@@ -246,63 +269,139 @@ const newenv = () => ({
     }
   },
 
+  $compileargs(args) {
+    return args.map(arg => this.$caris(arg, 'rest') ?
+                    '...' + this.$car(this.$cdr(arg)).name : arg.name);
+  },
+
+  $join(l, s) {
+    return l.join(s);
+  },
+
+  $mapcompile(l) {
+    return l.map(e => this.$compile(e));
+  },
+
+  $compilebase(form) {
+    if (this.$listp(form) && form.length > 0) {
+      let op = this.$car(form);
+      let comp = this.compilations[op.name];
+      if (comp) {
+        this.$log('have compilation', form);
+        return comp.apply(this, this.$cdr(form));
+      } else {
+        return `this.$eval(${this.$mapcompile(form)})`;
+        // return `${this.$compile(op)}.(${this.$cdr(form).map(arg => this.$compile(arg))})`;
+      }
+    } else if (this.$symbolp(form)) {
+      if (form.name[0] === "'") {
+        return `'${form.name.slice(1)}'`;
+      } else {
+        return `this['${form.name}']`;
+      }
+    } else {
+      return form;
+    }
+  },
+
+  $compile(form) {
+    let code = this.$compilebase(form);
+    this.$log('$compile', form, code);
+    return code;
+  },
+
+  compilations: {
+    $if(cond, then, elsse) {
+      return `${this.$compile(cond)} ? ${this.$compile(then)} : ${this.$compile(elsse)}`;
+    },
+    lt(a, b) {
+      return `${this.$compile(a)} < ${this.$compile(b)}`;
+    },
+    $vau(args, body, hygenic = true) {
+      let target = this.$compile(body);
+      const vauCode = `
+let lambdaEnv = this.childenv();
+lambdaEnv.hygenic = ${hygenic};
+${args.map(arg => `lambdaEnv['${arg.name}'] = ${arg.name};\n`)}
+${target};`;
+      const vauArgs = this.$compileargs(args);
+      this.$log('compilevau', body, vauCode, args, vauArgs);
+      vauArgs.push(vauCode);
+      return new Function(...vauArgs);
+    },
+    $uvau(args, body) {
+      return this.compilations.$vau(args, body, false);
+    },
+    $car(l) {
+      return `${this.$compile(l)}[0]`
+    },
+    $cdr(l) {
+      return `${this.$compile(l)}.slice(1)`;
+    },
+    list(...args) {
+      return this.$compile(args);
+    },
+    $wrap(fn) {
+      let cfn = this.$compile(fn);
+      return `function(...args) {
+        this.$debug('call wrapped fn', ${fn}, args);
+        return ${cfn}.apply(this, this.$mapeval(args));
+      }`;
+  },
+  },
+
   concat(...args) {
     return args.join('');
   },
 
-  $uvau(args, body) {
-    return this.$vau(args, body, false);
-  },
+  // $uvau(args, body) {
+  //   return this.$vau(args, body, false);
+  // },
 
-  $vau(args, body, hygenic = true) {
-    let target = body;
-    this.$debug('vau', args, body);
-    if (this.$compile) {
-      target = this.$compile(body);
-    }
-    let closure = this;
-    return (...passedArgs) => {
-      this.$debug('call vau', args, passedArgs);
-      let lambdaEnv = closure.$childenv();
-      lambdaEnv.hygenic = hygenic;
-      for (let i = 0; i < args.length; i++) {
-        let arg = args[i];
-        if (this.$caris(arg, 'rest')) {
-          this.$log('rest', arg);
-          let spread = this.$listp(arg) ? arg[1] : arg;
-          const remaining = args.length - i - 1;
-          lambdaEnv[spread.name] = passedArgs.slice(i, passedArgs.length - remaining);
-          if (remaining === 1) {
-            i++;
-            lambdaEnv[args[i].name] = passedArgs[passedArgs.length - 1];
-          } else if (remaining > 1) {
-            throw new Error(`more than one remaining for spread ${args}`);
-          }
-          this.$debug('vauarg spread', spread.name, lambdaEnv[spread.name]);
-        } else {
-          lambdaEnv[arg.name] = passedArgs[i];
-          this.$debug('vauarg', arg, lambdaEnv[arg.name]);
-        }
-      }
-      this.$debug(lambdaEnv);
-      let res = lambdaEnv.$eval(target);
-      return res;
-    };
-  },
-
-  $hygenicvau(args, body) {
-    let hygenv = this.$childenv();
-    hygenv.hygenic = true;
-    return hygenv.$vau(args, body);
-  },
+  // $vau(args, body, hygenic = true) {
+  //   let target = body;
+  //   this.$debug('vau', args, body);
+  //   if (this.$compile) {
+  //     target = `new Function(${this.$compileargs(args).join(',')}, \`${this.$compile(body)}\``;
+  //     this.$log('compiled to', target);
+  //   }
+  //   let closure = this;
+  //   return (...passedArgs) => {
+  //     this.$debug('call vau', args, passedArgs);
+  //     let lambdaEnv = closure.$childenv();
+  //     lambdaEnv.hygenic = hygenic;
+  //     for (let i = 0; i < args.length; i++) {
+  //       let arg = args[i];
+  //       if (this.$caris(arg, 'rest')) {
+  //         this.$log('rest', arg);
+  //         let spread = this.$listp(arg) ? arg[1] : arg;
+  //         const remaining = args.length - i - 1;
+  //         lambdaEnv[spread.name] = passedArgs.slice(i, passedArgs.length - remaining);
+  //         if (remaining === 1) {
+  //           i++;
+  //           lambdaEnv[args[i].name] = passedArgs[passedArgs.length - 1];
+  //         } else if (remaining > 1) {
+  //           throw new Error(`more than one remaining for spread ${args}`);
+  //         }
+  //         this.$debug('vauarg spread', spread.name, lambdaEnv[spread.name]);
+  //       } else {
+  //         lambdaEnv[arg.name] = passedArgs[i];
+  //         this.$debug('vauarg', arg, lambdaEnv[arg.name]);
+  //       }
+  //     }
+  //     this.$debug(lambdaEnv);
+  //     let res = lambdaEnv.$eval(target);
+  //     return res;
+  //   };
+  // },
 
   $qt(s) {
     return s;
   },
 
-  eval(...form) {
-    return this.$eval(...form);
-  },
+  // eval(...form) {
+  //   return this.$eval(...form);
+  // },
 
   $wrapapplicatives() {
     for (let fname in this) {
@@ -320,6 +419,10 @@ const newenv = () => ({
     this.$debug('$eval', form);
     if (Array.isArray(form)) {
       this.$debug('call', this.$car(form));
+      console.log(this);
+      let operator = this.$eval(this.$car(form));
+      let args = this.$cdr(form);
+
       return this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
     } else if (this.$symbolp(form)) {
       if (form.name[0] === "'") {
@@ -455,6 +558,16 @@ const newenv = () => ({
       }
     }
     return toks;
+  },
+
+  recover: false,
+
+  $tryrecover(fn) {
+    if (this.recover) {
+      fn();
+    } else {
+      process.exit(0);
+    }
   }
 });
 
@@ -491,7 +604,7 @@ try {
   env.$progn.apply(env, env.$parseToplevel(example));
 } catch (e) {
   console.log(e);
-  repl();
+  env.$tryrecover();
 }
 
 async function repl() {
@@ -501,7 +614,7 @@ async function repl() {
       repl();
     } catch (e) {
       replEnv.$log(e);
-      repl();
+      env.$tryrecover();
     }
   })
 }

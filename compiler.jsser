@@ -1,5 +1,6 @@
 ($wrapapplicatives)
-(debug)
+
+(log ($compile ($vau (l) ($car ($cdr l)))))
 ($define $umacro
   ($uvau (name args body)
     (eval '$define name (list '$uvau args body))))
@@ -13,6 +14,8 @@
 
 ($umacro $function (name args body)
   (eval '$define name (list '$lambda args body)))
+
+()
 
 ($function cadr (l) (car (cdr l)))
 
@@ -48,12 +51,12 @@
 ;; ($macro $compile (form)
 ;;   ())
 
-(log (fact (fib 10)))
-
-($function resty (first (rest middle) last)
+($function resty (first (rest others))
   (list last first middle))
 
-($function closure (n)
-  ($lambda (m) (* n m)))
+(log (resty 1 2 3 4 5))
 
-($define b (closure 6))
+($define m ($map (test 3)))
+($set m (test2 (* ($get m test) 2)))
+(log ($get m test2))
+(log (fib 20))
