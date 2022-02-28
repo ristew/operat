@@ -28,8 +28,8 @@ class Symbol {
 
 const newenv = () => ({
   shouldDebug: false,
-  debug() {
-    this.shouldDebug = !this.shouldDebug;
+  debug(mode = !this.shouldDebug) {
+    this.shouldDebug = mode;
   },
 
   cons(a, b) {
@@ -50,16 +50,17 @@ const newenv = () => ({
   '+': (a, b) => a + b,
   '-': (a, b) => a - b,
   '+comp': function(a, b) {
-    return `this.$eval(${this.$compile(a)}) + this.$eval(${this.$compile(b)})`;
+    return `${this.$compile(a)} + ${this.$compile(b)}`;
   },
   '-comp': function(a, b) {
-    return `this.$eval(${this.$compile(a)}) - this.$eval(${this.$compile(b)})`;
+    return `${this.$compile(a)} - ${this.$compile(b)}`;
   },
   '*comp': function(a, b) {
-    return `this.$eval(${this.$compile(a)}) * this.$eval(${this.$compile(b)})`;
+    return `${this.$compile(a)} * ${this.$compile(b)}`;
   },
   '/comp': function(a, b) {
-    return `this.$eval(${this.$compile(a)}) / this.$eval(${this.$compile(b)})`;
+    // return `this.$eval(${this.$compile(a)}) / this.$eval(${this.$compile(b)})`;
+    return `${this.$compile(a)} / ${this.$compile(b)}`;
   },
 
   car(l) {
@@ -108,11 +109,11 @@ const newenv = () => ({
   },
 
   $set(map, key, val) {
-    return this.$eval(map)[key] = val;
+    return this.$eval(map)[key] = this.$namefunction(val, key);
   },
 
   $mapp(m) {
-    return typeof m === 'object';
+    return m && typeof m === 'object';
   },
 
   $printlist(os){
@@ -152,19 +153,37 @@ const newenv = () => ({
     return typeof s === 'string';
   },
 
-  wrap(fn) {
-    return this.$wrap(fn);
+  wrap(fn, name) {
+    return this.$wrap(fn, name);
   },
 
-  $wrap(fn) {
+  $fnname(sym) {
+    return sym ? sym.name : 'anonymous';
+  },
+
+  $namefunction(fn, sym) {
+    if (sym && fn instanceof Function) {
+      Object.defineProperty(fn, 'name', {
+        value: sym.name,
+        writable: false,
+      });
+    }
+    return fn;
+  },
+
+  $wrap(fn, name) {
     if (typeof fn !== 'function') {
       throw new Error(`attempted to wrap a non-fn ${fn}`);
     }
     this.$debug('wrap', fn);
-    return function(...args) {
+    return this.$namefunction((...args) => {
       this.$debug('call wrapped fn', fn, args);
-      return fn.apply(this, this.$mapeval(args));
-    };
+      if (args[0] === 'unwrap') {
+        return fn.apply(this, args.slice(1));
+      } else {
+        return fn.apply(this, this.$mapeval(args));
+      }
+    }, name);
   },
 
   level: 0,
@@ -180,6 +199,9 @@ const newenv = () => ({
       get(obj, p) {
         if (p instanceof Symbol) {
           p = p.name;
+        }
+        if (p[0] === "'") {
+          return new Symbol(p.slice(1));
         }
         if (p in obj) {
           return obj[p];
@@ -269,8 +291,6 @@ const newenv = () => ({
     return value;
   },
 
-
-
   $define(symbol, value) {
     let val = this.$eval(value);
     this.$debug('define', symbol, val);
@@ -314,52 +334,66 @@ const newenv = () => ({
     }
   },
 
+  $logtime(form) {
+    let time = +new Date();
+    let res =this.$eval(form);
+    this.$log(form, res, (+new Date() - time) / 1000);
+    return res;
+  },
+
+  $compref(s) {
+    return `this['${s.name.replace(/'/g, "\\'")}']`;
+  },
+
   $compilebase(form) {
     if (this.$listp(form) && form.length > 0) {
       let op = this.$car(form);
       let comp = this[op.name + 'comp'];
       if (comp) {
-        this.$log('have compilation', form, comp);
         return comp.apply(this, this.$cdr(form));
+      } else if (op.name && op.name[0] !== '$') {
+        return `${this.$compref(op)}('unwrap', ${this.$mapcompile(this.$cdr(form))})`
       }
     } else if (this.$symbolp(form)) {
-      return `this['${form.name}']`;
+      return this.$compref(form);
     }
-    return this.$repr(form);
+    return `${this.$repr(form)}`;
   },
 
   $compile(form) {
     let code = this.$compilebase(form);
-    this.$log('$compile', form, code);
+    this.$debug('$compile', form, code);
     return code;
   },
 
   $trycompile(form) {
     try {
       let compiled = this.$compile(form);
-      this.$log('compiled', form, compiled);
       return compiled;
     } catch (e) {
-      this.$log('not compiled', form, e);
+      this.$debug('not compiled', form, e);
       return null;
     }
   },
 
   $ifcomp(cond, then, elsse) {
-    return `${this.$compile(cond)} ? this.$eval(${this.$compile(then)}) : this.$eval(${this.$compile(elsse)})`;
+    return `${this.$compile(cond)} ? ${this.$compile(then)} : ${this.$compile(elsse)}`;
   },
   ltcomp(a, b) {
     return `${this.$compile(a)} < ${this.$compile(b)}`;
   },
-  $vaucomp(args, body, hygenic = true) {
+  gtcomp(a, b) {
+    return `${this.$compile(a)} > ${this.$compile(b)}`;
+  },
+  eqcomp(a, b) {
+    return `${this.$compile(a)} === ${this.$compile(b)}`;
+  },
+  $vaucomp(args, body) {
     let target = this.$compile(body);
-    this.$log('target', JSON.stringify(target))
-    const vauCode = `this.hygenic = ${hygenic};
-${args.map(arg => `this['${arg.name}'] = ${arg.name};\n`).join('')}
-
-return this.$eval(${target});`;
+    const vauCode = `${args.map(arg => `this['${arg.name}'] = ${arg.name};\n`).join('')}
+return ${target};`;
     const vauArgs = this.$compileargs(args);
-    this.$log('compilevau', body, vauCode, args, vauArgs);
+    this.$debug('compilevau', body, vauCode, args, vauArgs);
     vauArgs.push(vauCode);
     return new Function(...vauArgs);
   },
@@ -380,21 +414,21 @@ return this.$eval(${target});`;
     return args.join('');
   },
 
-  $uvau(args, body) {
-    return this.$vau(args, body, false);
+  $uvau(args, body, name = null) {
+    return this.$vau(args, body, name, false);
   },
 
-  $vau(args, body, hygenic = true) {
+  $vau(args, body, name = null, hygenic = true) {
     let target = this.$vaucomp(args, body, hygenic);
-    this.$log('vau', args, body, target);
+    this.$debug('vau', name, args, body, target);
     let closure = this;
-    return (...passedArgs) => {
+    return this.$namefunction(function(...passedArgs) {
       this.$debug('call vau', args, passedArgs);
       let lambdaEnv = closure.$childenv();
       lambdaEnv.hygenic = hygenic;
       let res = target.apply(lambdaEnv, passedArgs);
       return res;
-    };
+    }, name);
   },
 
   $qt(s) {
@@ -561,6 +595,8 @@ return this.$eval(${target});`;
         let float = Number.parseFloat(sym);
         if (!isNaN(float)) {
           toks.push(float);
+        } else if (sym === 'true' || sym === 'false') {
+          toks.push(JSON.parse(sym))
         } else {
           toks.push(new Symbol(sym));
         }
@@ -582,7 +618,7 @@ return this.$eval(${target});`;
 });
 
 
-const example = readFileSync('./compiler.jsser').toString();
+const example = readFileSync('./compiler.operat').toString();
 
 export let env = newenv();
 env["'"] = function $qtlit(...args) {
