@@ -1,6 +1,7 @@
 ($wrapapplicatives)
 
 (log ($compile ($vau (l) ($car ($cdr l)))))
+(log ($compile ($lambda (n) (* n n))))
 (log (($uvau (n) (cons n n)) 'b))
 ;;(exit)
 ($define $umacro
@@ -26,6 +27,7 @@
   ($if (eq n 0)
     1
     (* n (fact (- n 1)))))
+(log (fact 10))
 
 ($function pow (n p)
   ($if (eq p 0)

@@ -49,6 +49,9 @@ const newenv = () => ({
   '/': (a, b) => a / b,
   '+': (a, b) => a + b,
   '-': (a, b) => a - b,
+  '*comp': function(a, b) {
+    return `${this.$compile(a)} * ${this.$compile(b)}`;
+  },
 
   car(l) {
     return l[0];
@@ -119,6 +122,7 @@ const newenv = () => ({
     } else if (this.$listp(o)) {
       return `(${this.$printlist(o)})`;
     } else if (this.$functionp(o)) {
+      return o;
       if (o.name) {
         return `$function ${o.name}`;
       } else {
@@ -287,9 +291,13 @@ const newenv = () => ({
       let op = this.$car(form);
       let comp = this[op.name + 'comp'];
       if (comp) {
-        this.$log('have compilation', form);
+        this.$log('have compilation', form, comp);
         return comp.apply(this, this.$cdr(form));
       } else {
+        this.$log('no compilation', form);
+        if (this.$symbolp(form[0])) {
+          return `${this.$compile(form[0])}(${this.$mapcompile(this.$cdr(form))})`;
+        }
         return `this.$eval(${this.$mapcompile(form)})`;
         // return `${this.$compile(op)}.(${this.$cdr(form).map(arg => this.$compile(arg))})`;
       }
@@ -297,7 +305,7 @@ const newenv = () => ({
       if (form.name[0] === "'") {
         return `'${form.name.slice(1)}'`;
       } else {
-        return `this['${form.name}']`;
+        return `this.${form.name}`;
       }
     } else {
       return form;
@@ -318,10 +326,10 @@ const newenv = () => ({
   },
   $vaucomp(args, body, hygenic = true) {
     let target = this.$compile(body);
-    const vauCode = `
-let lambdaEnv = this.childenv();
-lambdaEnv.hygenic = ${hygenic};
-${args.map(arg => `lambdaEnv['${arg.name}'] = ${arg.name};\n`)}
+    const vauCode = `let lambdaEnv = this.$childenv();
+this.hygenic = ${hygenic};
+${args.map(arg => `this['${arg.name}'] = ${arg.name};\n`).join('')}
+
 return ${target};`;
     const vauArgs = this.$compileargs(args);
     this.$log('compilevau', body, vauCode, args, vauArgs);
@@ -329,7 +337,7 @@ return ${target};`;
     return new Function(...vauArgs);
   },
   $uvaucomp(args, body) {
-    return this.compilations.$vau(args, body, false);
+    return this.$vaucomp(args, body, false);
   },
   $carcomp(l) {
     return `${this.$compile(l)}[0]`
@@ -340,12 +348,6 @@ return ${target};`;
   list(...args) {
     return args;
   },
-  // $wrapcomp(fn) {
-  //   return `function(...args) {
-  //       this.$debug('call wrapped fn', ${fn}, args);
-  //       return ${cfn}.apply(this, this.$mapeval(args));
-  //     }`;
-  // },
 
   concat(...args) {
     return args.join('');
@@ -356,8 +358,8 @@ return ${target};`;
   },
 
   $vau(args, body, hygenic = true) {
-    let target = body;
-    this.$debug('vau', args, body);
+    let target = this.$vaucomp(args, body, hygenic);
+    this.$log('vau', args, body, target);
     // if (this.$compile) {
     //   target = `new Function(${this.$compileargs(args).join(',')}, \`${this.$compile(body)}\``;
     //   this.$log('compiled to', target);
@@ -367,10 +369,11 @@ return ${target};`;
       this.$debug('call vau', args, passedArgs);
       let lambdaEnv = closure.$childenv();
       lambdaEnv.hygenic = hygenic;
+      let res = target.apply(lambdaEnv, passedArgs);
+      return res;
       for (let i = 0; i < args.length; i++) {
         let arg = args[i];
         if (this.$caris(arg, 'rest')) {
-          this.$log('rest', arg);
           let spread = this.$listp(arg) ? arg[1] : arg;
           const remaining = args.length - i - 1;
           lambdaEnv[spread.name] = passedArgs.slice(i, passedArgs.length - remaining);
@@ -387,8 +390,6 @@ return ${target};`;
         }
       }
       this.$debug(lambdaEnv);
-      let res = lambdaEnv.$eval(target);
-      return res;
     };
   },
 
@@ -403,8 +404,13 @@ return ${target};`;
   $wrapapplicatives() {
     for (let fname in this) {
       const fn = this[fname];
-      if (typeof fn === 'function' && /[\w\*\/\+\-]/.test(fn.name[0])) {
-        this[fname] = this.$wrap(fn);
+      if (typeof fn === 'function' &&
+          /[\w\*\/\+\-]/.test(fn.name[0])) {
+        if (fn.name.slice(-4) === 'comp') {
+          this[fname]
+        } else {
+          this[fname] = this.$wrap(fn);
+        }
       }
     }
   },
@@ -415,19 +421,13 @@ return ${target};`;
       form = form[0];
     }
     if (Array.isArray(form)) {
-      this.$debug('call', this.$car(form));
       let operator = this.$eval(this.$car(form));
       let args = this.$cdr(form);
 
-      // if (this.$symbolp(operator)) {
-      //   let maybeComp = this[operator.name + 'comp'];
-      //   if (maybeComp) {
-      //     return new Function('', maybeComp(args)).apply(this, []);
-      //   }
-      // }
       this.stack.push([operator, ...args])
       let res = this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
       this.stack.pop();
+      this.$debug('eval', operator, ...args, '=', res)
       return res;
     } else if (this.$symbolp(form)) {
       if (form.name[0] === "'") {
