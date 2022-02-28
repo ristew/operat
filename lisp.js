@@ -49,8 +49,17 @@ const newenv = () => ({
   '/': (a, b) => a / b,
   '+': (a, b) => a + b,
   '-': (a, b) => a - b,
+  '+comp': function(a, b) {
+    return `this.$eval(${this.$compile(a)}) + this.$eval(${this.$compile(b)})`;
+  },
+  '-comp': function(a, b) {
+    return `this.$eval(${this.$compile(a)}) - this.$eval(${this.$compile(b)})`;
+  },
   '*comp': function(a, b) {
-    return `${this.$compile(a)} * ${this.$compile(b)}`;
+    return `this.$eval(${this.$compile(a)}) * this.$eval(${this.$compile(b)})`;
+  },
+  '/comp': function(a, b) {
+    return `this.$eval(${this.$compile(a)}) / this.$eval(${this.$compile(b)})`;
   },
 
   car(l) {
@@ -169,6 +178,9 @@ const newenv = () => ({
       level: base.level + 1,
     }, {
       get(obj, p) {
+        if (p instanceof Symbol) {
+          p = p.name;
+        }
         if (p in obj) {
           return obj[p];
         } else if (obj.parent) {
@@ -219,6 +231,10 @@ const newenv = () => ({
     } else {
       return false;
     }
+  },
+
+  $symbol(s) {
+    return new Symbol(s);
   },
 
   $caris(form, name) {
@@ -286,6 +302,18 @@ const newenv = () => ({
     return l.map(e => this.$compile(e));
   },
 
+  $repr(form) {
+    if (this.$symbolp(form)) {
+      return `this.$symbol(${this.$repr(form.name)})`;
+    } else if (this.$listp(form)) {
+      return `[${form.map(e => this.$repr(e)).join(', ')}]`
+    } else if (this.$stringp(form)) {
+      return `'${form.replace(/'/g, "\\'")}'`;
+    } else {
+      return form.toString();
+    }
+  },
+
   $compilebase(form) {
     if (this.$listp(form) && form.length > 0) {
       let op = this.$car(form);
@@ -293,23 +321,11 @@ const newenv = () => ({
       if (comp) {
         this.$log('have compilation', form, comp);
         return comp.apply(this, this.$cdr(form));
-      } else {
-        this.$log('no compilation', form);
-        if (this.$symbolp(form[0])) {
-          return `${this.$compile(form[0])}(${this.$mapcompile(this.$cdr(form))})`;
-        }
-        return `this.$eval(${this.$mapcompile(form)})`;
-        // return `${this.$compile(op)}.(${this.$cdr(form).map(arg => this.$compile(arg))})`;
       }
     } else if (this.$symbolp(form)) {
-      if (form.name[0] === "'") {
-        return `'${form.name.slice(1)}'`;
-      } else {
-        return `this.${form.name}`;
-      }
-    } else {
-      return form;
+      return `this['${form.name}']`;
     }
+    return this.$repr(form);
   },
 
   $compile(form) {
@@ -318,19 +334,30 @@ const newenv = () => ({
     return code;
   },
 
+  $trycompile(form) {
+    try {
+      let compiled = this.$compile(form);
+      this.$log('compiled', form, compiled);
+      return compiled;
+    } catch (e) {
+      this.$log('not compiled', form, e);
+      return null;
+    }
+  },
+
   $ifcomp(cond, then, elsse) {
-    return `${this.$compile(cond)} ? ${this.$compile(then)} : ${this.$compile(elsse)}`;
+    return `${this.$compile(cond)} ? this.$eval(${this.$compile(then)}) : this.$eval(${this.$compile(elsse)})`;
   },
   ltcomp(a, b) {
     return `${this.$compile(a)} < ${this.$compile(b)}`;
   },
   $vaucomp(args, body, hygenic = true) {
     let target = this.$compile(body);
-    const vauCode = `let lambdaEnv = this.$childenv();
-this.hygenic = ${hygenic};
+    this.$log('target', JSON.stringify(target))
+    const vauCode = `this.hygenic = ${hygenic};
 ${args.map(arg => `this['${arg.name}'] = ${arg.name};\n`).join('')}
 
-return ${target};`;
+return this.$eval(${target});`;
     const vauArgs = this.$compileargs(args);
     this.$log('compilevau', body, vauCode, args, vauArgs);
     vauArgs.push(vauCode);
@@ -360,10 +387,6 @@ return ${target};`;
   $vau(args, body, hygenic = true) {
     let target = this.$vaucomp(args, body, hygenic);
     this.$log('vau', args, body, target);
-    // if (this.$compile) {
-    //   target = `new Function(${this.$compileargs(args).join(',')}, \`${this.$compile(body)}\``;
-    //   this.$log('compiled to', target);
-    // }
     let closure = this;
     return (...passedArgs) => {
       this.$debug('call vau', args, passedArgs);
@@ -371,25 +394,6 @@ return ${target};`;
       lambdaEnv.hygenic = hygenic;
       let res = target.apply(lambdaEnv, passedArgs);
       return res;
-      for (let i = 0; i < args.length; i++) {
-        let arg = args[i];
-        if (this.$caris(arg, 'rest')) {
-          let spread = this.$listp(arg) ? arg[1] : arg;
-          const remaining = args.length - i - 1;
-          lambdaEnv[spread.name] = passedArgs.slice(i, passedArgs.length - remaining);
-          if (remaining === 1) {
-            i++;
-            lambdaEnv[args[i].name] = passedArgs[passedArgs.length - 1];
-          } else if (remaining > 1) {
-            throw new Error(`more than one remaining for spread ${args}`);
-          }
-          this.$debug('vauarg spread', spread.name, lambdaEnv[spread.name]);
-        } else {
-          lambdaEnv[arg.name] = passedArgs[i];
-          this.$debug('vauarg', arg, lambdaEnv[arg.name]);
-        }
-      }
-      this.$debug(lambdaEnv);
     };
   },
 
@@ -568,7 +572,7 @@ return ${target};`;
   recover: true,
 
   $tryrecover(e, fn) {
-    this.$log(e, this.stack);
+    this.$log(e);
     if (this.recover) {
       fn();
     } else {

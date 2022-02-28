@@ -1,7 +1,6 @@
 ($wrapapplicatives)
 
 (log ($compile ($vau (l) ($car ($cdr l)))))
-(log ($compile ($lambda (n) (* n n))))
 (log (($uvau (n) (cons n n)) 'b))
 ;;(exit)
 ($define $umacro
@@ -14,14 +13,15 @@
 
 ($macro $lambda (args body)
   (wrap (eval '$uvau args body)))
+(log ($compile ($lambda (n) (* n n))))
 
 ($umacro $function (name args body)
   (eval '$define name (list '$lambda args body)))
 
 ($function cadr (l) (car (cdr l)))
 
-($umacro $defs ((rest bindings))
-  (mapcar bindings ($uvau (binding) (eval '$define (car binding) (cadr binding)))))
+;;j($umacro $defs ((rest bindings))
+;;  (mapcar bindings ($uvau (binding) (eval '$define (car binding) (cadr binding)))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -39,10 +39,10 @@
   ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
-($defs
-  (pi 3.14)
-  (testno 100)
-  (circ ($lambda (r) (* 2 (* pi r)))))
+;; ($defs
+;;   (pi 3.14)
+;;   (testno 100)
+;;   (circ ($lambda (r) (* 2 (* pi r)))))
 
 ($macro $let (cases inner)
   ())
@@ -53,12 +53,13 @@
 ;; ($macro $compile (form)
 ;;   ())
 
-($function resty (first (rest others))
-  (cons first others))
-
-(log (resty 1 2 3 4 5))
+;; ($function resty (first (rest others))
+;;   (cons first others))
+;;
+;; (log (resty 1 2 3 4 5))
 
 ($define m ($map (test 3)))
 ($set m (test2 (* ($get m test) 2)))
 (log ($get m test2))
 (log (fib 20))
+(exit)
