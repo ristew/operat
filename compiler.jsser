@@ -1,6 +1,8 @@
 ($wrapapplicatives)
 
 (log ($compile ($vau (l) ($car ($cdr l)))))
+(log (($uvau (n) (cons n n)) 'b))
+;;(exit)
 ($define $umacro
   ($uvau (name args body)
     (eval '$define name (list '$uvau args body))))
@@ -14,8 +16,6 @@
 
 ($umacro $function (name args body)
   (eval '$define name (list '$lambda args body)))
-
-()
 
 ($function cadr (l) (car (cdr l)))
 
@@ -52,7 +52,7 @@
 ;;   ())
 
 ($function resty (first (rest others))
-  (list last first middle))
+  (cons first others))
 
 (log (resty 1 2 3 4 5))
 
