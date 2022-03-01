@@ -27,6 +27,7 @@ class Symbol {
 }
 
 const newenv = () => ({
+  // neat little trick for a toggle
   shouldDebug: false,
   debug(mode = !this.shouldDebug) {
     this.shouldDebug = mode;
@@ -59,7 +60,6 @@ const newenv = () => ({
     return `${this.$compile(a)} * ${this.$compile(b)}`;
   },
   '/comp': function(a, b) {
-    // return `this.$eval(${this.$compile(a)}) / this.$eval(${this.$compile(b)})`;
     return `${this.$compile(a)} / ${this.$compile(b)}`;
   },
 
@@ -194,6 +194,7 @@ const newenv = () => ({
         if (p[0] === "'") {
           return new Symbol(p.slice(1));
         }
+        // lexical scoping is this easy
         if (p in obj) {
           return obj[p];
         } else if (obj.parent) {
@@ -267,13 +268,8 @@ const newenv = () => ({
   },
 
   nativefib(n) {
-    //   ($if (lt n 2) 1 (+ (fib (- n 1)) (fib (- n 2))))
     return (n < 2) ? (1) : (this.nativefib(n - 1) + this.nativefib(n - 2));
   },
-
-  compiledfib: new Function('n', `
-    return (n < 2) ? (1) : (this.nativefib(n - 1) + this.nativefib(n - 2));
-`),
 
   $set(symbol, value) {
     if (this.parent && !this.hygenic) {
@@ -296,7 +292,6 @@ const newenv = () => ({
   },
 
   $if(cond, then, elsse) {
-    // ($if ($eval cond) ($eval then) ($eval else))
     if (this.$eval(cond)) {
       return this.$eval(then);
     } else {
@@ -340,7 +335,7 @@ const newenv = () => ({
     return `this['${s.name.replace(/'/g, "\\'")}']`;
   },
 
-  $compilebase(form) {
+  $compile(form) {
     if (this.$listp(form) && form.length > 0) {
       let op = this.$car(form);
       let comp = this[op.name + 'comp'];
@@ -358,15 +353,11 @@ const newenv = () => ({
   compile(form) {
     return this.$compile(form);
   },
-  $compile(form) {
-    let code = this.$compilebase(form);
-    this.$debug('$compile', form, code);
-    return code;
-  },
 
   $trycompile(form) {
     try {
       let compiled = this.$compile(form);
+      this.$debug('$compile', form, compiled);
       return compiled;
     } catch (e) {
       this.$debug('not compiled', form, e);
@@ -468,14 +459,6 @@ return ${target};`;
           this[fname] = this.$wrap(fn);
         }
       }
-    }
-  },
-
-  $expandvauarg(arg) {
-    if (this.$symbolp(arg) && arg.name[0] === '~') {
-      return this.$eval(this.$symbol(arg.name.slice(1)));
-    } else {
-      return arg;
     }
   },
 
@@ -645,22 +628,6 @@ return ${target};`;
 const example = readFileSync('./core.operat').toString();
 
 export let env = newenv();
-env["'"] = function $qtlit(...args) {
-  return args;
-};
-
-env["`"] = function $qslit(...args) {
-  let res = this.$mapcar(args, arg => {
-    if (this.$caris(arg, ',')) {
-      return this.$eval(this.$car(this.$cdr(arg)));
-    } else {
-      return arg;
-    }
-  });
-
-  this.$debug('quasiquote', res);
-  return res;
-};
 
 const rl = readline.createInterface({
   input: process.stdin,

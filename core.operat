@@ -17,6 +17,10 @@
 ($umacro $comp (name args body)
   (eval $define (eval $symextend name "comp") (list $vau args body)))
 
+;; broken
+($macro $let (defs body)
+  (eval (eval $lambda (mapcar defs car) body) (mapcar defs cadr)))
+
 ($comp car (l)
   (concat (compile l) "[0]"))
 
@@ -44,8 +48,8 @@
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
 
-($logtime (fib 24))
 ($logtime (nativefib 24))
+($logtime (fib 24))
 (log ($compile ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2))))))
