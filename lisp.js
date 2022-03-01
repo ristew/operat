@@ -549,10 +549,6 @@ return ${target};`;
     return fn.apply(fnenv, args);
   },
 
-  $atom(s) {
-    return new Symbol(s);
-  },
-
   $numberp: s => typeof s === 'number',
 
   $symbolp(s) {
@@ -618,7 +614,7 @@ return ${target};`;
 });
 
 
-const example = readFileSync('./compiler.operat').toString();
+const example = readFileSync('./core.operat').toString();
 
 export let env = newenv();
 env["'"] = function $qtlit(...args) {

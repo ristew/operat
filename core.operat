@@ -1,7 +1,5 @@
 ($wrapapplicatives)
 
-;; (log (($uvau (n) (cons n n)) 'b))
-;;(exit)
 ($define $umacro
   ($uvau (name args body)
     (eval '$define name (list '$uvau args body name)) $umacro))
@@ -17,9 +15,6 @@
   (eval '$define name (list '$lambda args body name)))
 
 ($function cadr (l) (car (cdr l)))
-
-;;j($umacro $defs ((rest bindings))
-;;  (mapcar bindings ($uvau (binding) (eval '$define (car binding) (cadr binding)))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -37,31 +32,9 @@
   ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
-;; ($defs
-;;   (pi 3.14)
-;;   (testno 100)
-;;   (circ ($lambda (r) (* 2 (* pi r)))))
 
-($macro $let (cases inner)
-  ())
-;;
-;; ($macro $case (obj bindings)
-;;   ())
-;;
-;; ($macro $compile (form)
-;;   ())
-
-;; ($function resty (first (rest others))
-;;   (cons first others))
-;;
-;; (log (resty 1 2 3 4 5))
-
-($define m ($map (test 3)))
-($set m (test2 (* ($get m test) 2)))
-(log ($get m test2))
 ($logtime (fib 24))
 ($logtime (nativefib 24))
 (log ($compile ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2))))))
-(exit)
