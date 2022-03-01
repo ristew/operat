@@ -133,7 +133,7 @@ const newenv = () => ({
     } else if (this.$numberp(o)) {
       return o;
     } else if (this.$stringp(o)) {
-      return `"${o}"`;
+      return `${o}`;
     } else if (this.$listp(o)) {
       return `(${this.$printlist(o)})`;
     } else if (this.$functionp(o)) {
@@ -246,6 +246,10 @@ const newenv = () => ({
     }
   },
 
+  $symextend(...args) {
+    return this.$symbol(args.join(''));
+  },
+
   $symbol(s) {
     return new Symbol(s);
   },
@@ -351,6 +355,9 @@ const newenv = () => ({
     return `${this.$repr(form)}`;
   },
 
+  compile(form) {
+    return this.$compile(form);
+  },
   $compile(form) {
     let code = this.$compilebase(form);
     this.$debug('$compile', form, code);
@@ -396,6 +403,9 @@ return ${target};`;
   },
   $cdrcomp(l) {
     return `${this.$compile(l)}.slice(1)`;
+  },
+  listcomp(...args) {
+    return `[${this.$mapcompile(args).join(', ')}]`;
   },
   list(...args) {
     return args;
@@ -461,6 +471,14 @@ return ${target};`;
     }
   },
 
+  $expandvauarg(arg) {
+    if (this.$symbolp(arg) && arg.name[0] === '~') {
+      return this.$eval(this.$symbol(arg.name.slice(1)));
+    } else {
+      return arg;
+    }
+  },
+
   stack: [],
   $eval(...form) {
     if (form.length === 1) {
@@ -470,7 +488,7 @@ return ${target};`;
       let operator = this.$eval(this.$car(form));
       let args = this.$cdr(form);
 
-      this.stack.push([operator, ...args])
+      this.stack.push([this.$print(operator), this.$print(...args)])
       let res = this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
       this.stack.pop();
       this.$debug('eval', operator, ...args, '=', res)
@@ -583,10 +601,11 @@ return ${target};`;
         }
       } else if (' \n\t'.includes(c)) {
       } else if (c === '"') {
-        i++;
         let str = '';
+        i++;
         while (s[i] !== '"') {
           str += s[i];
+          i++;
         }
         toks.push(str);
       } else {
@@ -613,6 +632,7 @@ return ${target};`;
 
   $tryrecover(e, fn) {
     this.$log(e);
+    this.$log(this.stack.slice().reverse());
     if (this.recover) {
       fn();
     } else {

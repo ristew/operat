@@ -2,19 +2,30 @@
 
 ($define $umacro
   ($uvau (name args body)
-    (eval '$define name (list '$uvau args body name)) $umacro))
+    (eval $define name (eval $uvau args body name)) $umacro))
 
 ($define $macro
   ($uvau (name args body)
-    (eval '$define name (list '$vau args body name)) $macro))
+    (eval $define name (list $vau args body name)) $macro))
 
 ($macro $lambda (args body name)
-  (wrap (eval '$uvau args body) name))
+  (wrap (eval $uvau args body) name))
 
 ($umacro $function (name args body)
-  (eval '$define name (list '$lambda args body name)))
+  (eval $define name (list $lambda args body name)))
+
+($umacro $comp (name args body)
+  (eval $define (eval $symextend name "comp") (list $vau args body)))
+
+($comp car (l)
+  (concat (compile l) "[0]"))
+
+($comp cdr (l)
+  (concat (compile l) ".slice(1)"))
 
 ($function cadr (l) (car (cdr l)))
+
+(log ($compile (car (cdr (list 1 2)))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -38,4 +49,3 @@
 (log ($compile ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2))))))
-
