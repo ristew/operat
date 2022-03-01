@@ -22,7 +22,7 @@ class Symbol {
   }
 
   toString() {
-    return '`' + this.name + '`';
+    return this.name;
   }
 }
 
@@ -109,7 +109,7 @@ const newenv = () => ({
   },
 
   $set(map, key, val) {
-    return this.$eval(map)[key] = this.$namefunction(val, key);
+    return this.$eval(map)[key] = val;
   },
 
   $mapp(m) {
@@ -120,7 +120,12 @@ const newenv = () => ({
     return os.map(e => this.$print(e)).join(' ');
   },
 
-  $print(o, pp = false) {
+  $vaup(fn) {
+    let name = this.$name(fn);
+    return name[0] === '$';
+  },
+
+  $print(o) {
     if (o instanceof Error) {
       return o.stack;
     } else if (this.$symbolp(o)) {
@@ -132,12 +137,8 @@ const newenv = () => ({
     } else if (this.$listp(o)) {
       return `(${this.$printlist(o)})`;
     } else if (this.$functionp(o)) {
-      return o;
-      if (o.name) {
-        return `$function ${o.name}`;
-      } else {
-        return `$vau`;
-      }
+      let name = this.$name(o);
+      return `(${this.$vaup(o) ? '$vau' : '$lambda'} ${name})`;
     } else if (this.$mapp(o)) {
       return `\n(map ${this.$printlist(Object.entries(o).map(([key, val]) => [new Symbol(key), val]))})\n`
     } else if (this.$booleanp(o)) {
@@ -157,33 +158,23 @@ const newenv = () => ({
     return this.$wrap(fn, name);
   },
 
-  $fnname(sym) {
-    return sym ? sym.name : 'anonymous';
-  },
-
-  $namefunction(fn, sym) {
-    if (sym && fn instanceof Function) {
-      Object.defineProperty(fn, 'name', {
-        value: sym.name,
-        writable: false,
-      });
-    }
-    return fn;
-  },
-
   $wrap(fn, name) {
     if (typeof fn !== 'function') {
       throw new Error(`attempted to wrap a non-fn ${fn}`);
     }
     this.$debug('wrap', fn);
-    return this.$namefunction((...args) => {
+    // don't set for name on function
+    let resfn = (() => (...args) => {
       this.$debug('call wrapped fn', fn, args);
       if (args[0] === 'unwrap') {
         return fn.apply(this, args.slice(1));
       } else {
         return fn.apply(this, this.$mapeval(args));
       }
-    }, name);
+    })();
+    resfn.vauname = name;
+    resfn.wrapped = true;
+    return resfn;
   },
 
   level: 0,
@@ -422,13 +413,30 @@ return ${target};`;
     let target = this.$vaucomp(args, body, hygenic);
     this.$debug('vau', name, args, body, target);
     let closure = this;
-    return this.$namefunction(function(...passedArgs) {
+    let resfn = (() => function(...passedArgs) {
       this.$debug('call vau', args, passedArgs);
       let lambdaEnv = closure.$childenv();
       lambdaEnv.hygenic = hygenic;
       let res = target.apply(lambdaEnv, passedArgs);
       return res;
-    }, name);
+    })();
+    resfn.vauname = name;
+    resfn.args = args;
+    resfn.body = body;
+    resfn.hygenic = hygenic;
+    return resfn;
+  },
+
+  // naming functions with Object.defineProperty makes them slower
+  // see https://humanwhocodes.com/blog/2015/11/performance-implication-object-defineproperty/
+  $name(fn) {
+    if (fn.name) {
+      return fn.name;
+    } else if (fn.vauname) {
+      return fn.vauname.name;
+    } else {
+      return 'none';
+    }
   },
 
   $qt(s) {
