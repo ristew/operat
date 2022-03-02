@@ -15,4 +15,4 @@ Operative combiners are prefixed wth `$`. By switching `$lambda` for `$vau` as t
 
 Which is only around 5x slower on my machine for `(fib 24)`, but I expect there may be more improvements in proper tail-call optimization - the recursive calls to `fib` will pass through a wrapper function that evals the operands into arguments.
 
-Currently, operat is a messy proof of concept. There are some pieces missing, like `$cond` and much more of the standard library. I aim to build an object system for it and bring it into the browser where a native development environment can be created. I welcome comments and criticism, but am not yet seeking contributions.
+Currently, operat is a messy proof of concept. There are many pieces missing, including a standard library. I aim to build an object system for it and bring it into the browser where a native development environment can be created. I welcome comments and criticism, but am not yet seeking contributions.

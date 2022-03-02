@@ -17,19 +17,21 @@
 ($umacro $comp (name args body)
   (~$define (~$symextend name "comp") (~$vau args body)))
 
-($comp car (l)
-  (concat (compile l) "[0]"))
-
-($comp cdr (l)
-  (concat (compile l) ".slice(1)"))
-
 ($macro $cadr (l) ($car ($cdr l)))
+
 ($function cadr (l) (car (cdr l)))
 
 ($macro $let (defs body)
   (eval (cons (~$lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
 
-(log ($compile (car (cdr (list 1 2)))))
+($macro $cond ((rest ifthens))
+  ($let
+    ((head (car ifthens)))
+    ($if (eval (car head))
+      (cadr head)
+      ($if (nil (cdr ifthens))
+        false
+        (apply $cond (cdr ifthens))))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -60,4 +62,7 @@
      (factn (fact n)))
     (* fibn factn)))
 ($logtime (fibfact 20))
-(exit)
+
+(log (concat "cond "($cond
+  ((lt (fib 5) 150) "good")
+  ((gt (fib 5) 150) "bad"))))

@@ -169,7 +169,7 @@ const newenv = () => ({
     // don't set for name on function
     let resfn = (() => function(...args) {
       this.$debug('wrap', 'call fn', fn, args);
-      if (args[0] === 'unwrap') {
+      if (args.length > 0 && args[0].toString() === '$') {
         return fn.apply(this, args.slice(1));
       } else {
         return fn.apply(this, this.$mapeval(args));
@@ -226,10 +226,6 @@ const newenv = () => ({
     return env;
   },
 
-  eq(a, b) {
-    return this.$eq(a, b);
-  },
-
   gt(a, b) {
     return a > b;
   },
@@ -238,15 +234,32 @@ const newenv = () => ({
     return a < b;
   },
 
+  eq(a, b) {
+    return this.$eq(a, b);
+  },
+
   $eq(a, b) {
     if (this.$numberp(a)) {
       return a === b
     } else if (this.$symbolp(a) && this.$symbolp(b)) {
-      return a.name === b.name;
+      return this.$name(a) && this.$name(a) === this.$name(b);
     } else if (this.$listp(a) && this.$listp(b)) {
       return a.length === 0 && b.length === 0;
     } else {
-      return false;
+      return a == b;
+    }
+  },
+
+  is(arg) {
+    return !this.nil('$', arg);
+  },
+
+  nil(arg) {
+    this.$debug('nil', arg);
+    if (this.$listp(arg)) {
+      return arg.length === 0;
+    } else {
+      return !arg;
     }
   },
 
@@ -295,16 +308,12 @@ const newenv = () => ({
   },
 
   $if(cond, then, elsse) {
+    this.$debug('if', cond, then, elsse);
     if (this.$eval(cond)) {
       return this.$eval(then);
     } else {
       return this.$eval(elsse);
     }
-  },
-
-  $compileargs(args) {
-    return args.map(arg => this.$caris(arg, 'rest') ?
-                    '...' + this.$car(this.$cdr(arg)).name : arg.name);
   },
 
   $join(l, s) {
@@ -345,7 +354,7 @@ const newenv = () => ({
       if (comp) {
         return comp.apply(this, this.$cdr(form));
       } else if (op.name && !op.name.includes('$')) {
-        return `${this.$compref(op)}('unwrap', ${this.$mapcompile(this.$cdr(form))})`
+        return `${this.$compref(op)}('$', ${this.$mapcompile(this.$cdr(form))})`
       }
     } else if (this.$symbolp(form)) {
       return this.$compref(form);
@@ -380,18 +389,6 @@ const newenv = () => ({
   eqcomp(a, b) {
     return `${this.$compile(a)} === ${this.$compile(b)}`;
   },
-  $vaucomp(args, body) {
-    let target = this.$compile(body);
-    const vauCode = `${args.map(arg => `this['${arg.name}'] = ${arg.name};\n`).join('')}
-return ${target};`;
-    const vauArgs = this.$compileargs(args);
-    this.$debug('compilevau', body, vauCode, args, vauArgs);
-    vauArgs.push(vauCode);
-    return new Function(...vauArgs);
-  },
-  $uvaucomp(args, body) {
-    return this.$vaucomp(args, body, false);
-  },
   $carcomp(l) {
     return `${this.$compile(l)}[0]`
   },
@@ -409,6 +406,34 @@ return ${target};`;
     return args.join('');
   },
 
+  $compileargs(args) {
+    return args.map(arg => this.$caris(arg, 'rest') ?
+                    '...' + this.$car(this.$cdr(arg)).name : arg.name);
+  },
+
+  $argname(arg) {
+    if (this.$symbolp(arg)) {
+      return arg;
+    } else if (this.$caris(arg, 'rest')) {
+      return this.$car(this.$cdr(arg));
+    }
+  },
+
+  $vaucomp(args, body) {
+    let target = this.$compile(body);
+    const vauCode = `${args.map(arg => {
+let argname = this.$argname(arg);
+return `this['${argname}'] = ${argname};\n`;
+}).join('')}
+return ${target};`;
+    const vauArgs = this.$compileargs(args);
+    this.$debug('vaucomp', body, vauCode, args, vauArgs);
+    vauArgs.push(vauCode);
+    return new Function(...vauArgs);
+  },
+  $uvaucomp(args, body) {
+    return this.$vaucomp(args, body, false);
+  },
   $uvau(args, body, name = null) {
     return this.$vau(args, body, name, false);
   },
@@ -416,7 +441,6 @@ return ${target};`;
   $vau(args, body, name = null, hygenic = true) {
     let target = this.$vaucomp(args, body, hygenic);
     this.$debug('vau', name, args, body, target);
-    let closure = this;
     let resfn = (() => function(...passedArgs) {
       this.$debug('call vau', args, passedArgs);
       let lambdaEnv = this.$childenv();
