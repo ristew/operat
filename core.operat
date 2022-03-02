@@ -17,17 +17,18 @@
 ($umacro $comp (name args body)
   (eval $define (eval $symextend name "comp") (list $vau args body)))
 
-;; broken
-($macro $let (defs body)
-  (eval (eval $lambda (mapcar defs car) body) (mapcar defs cadr)))
-
 ($comp car (l)
   (concat (compile l) "[0]"))
 
 ($comp cdr (l)
   (concat (compile l) ".slice(1)"))
 
+($macro $cadr (l) ($car ($cdr l)))
 ($function cadr (l) (car (cdr l)))
+
+;; broken
+($macro $let (defs body)
+  (eval (cons (list '$lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
 
 (log ($compile (car (cdr (list 1 2)))))
 
@@ -53,3 +54,11 @@
 (log ($compile ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2))))))
+
+($function fibfact (n)
+  ($let
+    ((fibn (fib n))
+     (factn (fact n)))
+    (* fibn factn)))
+;;(apply ($lambda (fibn factn) (* fibn factn)) (list (fib n) (fact n))
+(log (fibfact 4))

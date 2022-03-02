@@ -122,7 +122,7 @@ const newenv = () => ({
 
   $vaup(fn) {
     let name = this.$name(fn);
-    return name[0] === '$';
+    return name && name[0] === '$';
   },
 
   $print(o) {
@@ -347,7 +347,7 @@ const newenv = () => ({
     } else if (this.$symbolp(form)) {
       return this.$compref(form);
     }
-    return `${this.$repr(form)}`;
+    return `this.$eval(${this.$repr(form)})`;
   },
 
   compile(form) {
@@ -454,9 +454,9 @@ return ${target};`;
       if (typeof fn === 'function' &&
           /[\w\*\/\+\-]/.test(fn.name[0])) {
         if (fn.name.slice(-4) === 'comp') {
-          this[fname]
+          this[fname];
         } else {
-          this[fname] = this.$wrap(fn);
+          this[fname] = this.$wrap(fn, fname);
         }
       }
     }
@@ -467,6 +467,7 @@ return ${target};`;
     if (form.length === 1) {
       form = form[0];
     }
+    this.$debug('base eval', form);
     if (Array.isArray(form)) {
       let operator = this.$eval(this.$car(form));
       let args = this.$cdr(form);
@@ -482,6 +483,7 @@ return ${target};`;
       }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
+        this.$log(this);
         throw new Error(`undefined ${form}`);
       }
       this.$debug('symbol', form, this[form.name]);
@@ -541,6 +543,7 @@ return ${target};`;
   },
 
   mapcar(l, fn) {
+    this.$debug('mapcar', l, fn);
     return this.$mapcar(l, fn);
   },
 
@@ -555,6 +558,7 @@ return ${target};`;
 
   apply(fn, args) {
     let fnenv = this.$childenv(true);
+    this.$debug('apply', fn, args);
     return fn.apply(fnenv, args);
   },
 
