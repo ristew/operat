@@ -2,20 +2,20 @@
 
 ($define $umacro
   ($uvau (name args body)
-    (eval $define name (eval $uvau args body name)) $umacro))
+    (~$define name (~$uvau args body name)) $umacro))
 
 ($define $macro
   ($uvau (name args body)
-    (eval $define name (list $vau args body name)) $macro))
+    (~$define name (~$vau args body name)) $macro))
 
 ($macro $lambda (args body name)
-  (wrap (eval $uvau args body) name))
+  (wrap (~$uvau args body) name))
 
 ($umacro $function (name args body)
-  (eval $define name (list $lambda args body name)))
+  (~$define name (list $lambda args body name)))
 
 ($umacro $comp (name args body)
-  (eval $define (eval $symextend name "comp") (list $vau args body)))
+  (~$define (~$symextend name "comp") (~$vau args body)))
 
 ($comp car (l)
   (concat (compile l) "[0]"))
@@ -26,9 +26,8 @@
 ($macro $cadr (l) ($car ($cdr l)))
 ($function cadr (l) (car (cdr l)))
 
-;; broken
 ($macro $let (defs body)
-  (eval (cons (list '$lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
+  (eval (cons (~$lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
 
 (log ($compile (car (cdr (list 1 2)))))
 
@@ -50,7 +49,7 @@
     (+ (fib (- n 1)) (fib (- n 2)))))
 
 ;; ($logtime (nativefib 20))
-($logtime (fib 10))
+($logtime (fib 20))
 (log ($compile ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2))))))
@@ -60,6 +59,5 @@
     ((fibn (fib n))
      (factn (fact n)))
     (* fibn factn)))
-;;(apply ($lambda (fibn factn) (* fibn factn)) (list (fib n) (fact n))
 ($logtime (fibfact 20))
 (exit)

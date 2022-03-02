@@ -125,7 +125,7 @@ const newenv = () => ({
 
   $vaup(fn) {
     let name = this.$name(fn);
-    return name && name[0] === '$';
+    return name && (name[0] === '$' || name.indexOf('~$') === 0);
   },
 
   $print(o) {
@@ -344,7 +344,7 @@ const newenv = () => ({
       let comp = this[op.name + 'comp'];
       if (comp) {
         return comp.apply(this, this.$cdr(form));
-      } else if (op.name && op.name[0] !== '$') {
+      } else if (op.name && !op.name.includes('$')) {
         return `${this.$compref(op)}('unwrap', ${this.$mapcompile(this.$cdr(form))})`
       }
     } else if (this.$symbolp(form)) {
@@ -487,6 +487,8 @@ return ${target};`;
     } else if (this.$symbolp(form)) {
       if (form.name[0] === "'") {
         return new Symbol(form.name.slice(1));
+      } else if (form.name[0] === "~") {
+        return this.wrap(new Symbol(form.name.slice(1)));
       }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
