@@ -49,8 +49,8 @@
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
 
-($logtime (nativefib 24))
-($logtime (fib 24))
+;; ($logtime (nativefib 20))
+($logtime (fib 10))
 (log ($compile ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2))))))
@@ -61,4 +61,5 @@
      (factn (fact n)))
     (* fibn factn)))
 ;;(apply ($lambda (fibn factn) (* fibn factn)) (list (fib n) (fact n))
-(log (fibfact 4))
+($logtime (fibfact 20))
+(exit)

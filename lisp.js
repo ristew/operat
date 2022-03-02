@@ -27,12 +27,6 @@ class Symbol {
 }
 
 const newenv = () => ({
-  // neat little trick for a toggle
-  shouldDebug: false,
-  debug(mode = !this.shouldDebug) {
-    this.shouldDebug = mode;
-  },
-
   cons(a, b) {
     return this.$cons(a, b);
   },
@@ -88,9 +82,18 @@ const newenv = () => ({
     this.$log(...args);
   },
 
-  $debug(...args) {
-    if (this.shouldDebug) {
-      this.$log.apply(this, args);
+  shoulddebug: {},
+  debug(item) {
+    this.shoulddebug[item] = true;
+  },
+
+  cleardebug() {
+    this.shoulddebug = {};
+  },
+
+  $debug(subject, ...args) {
+    if (this.shoulddebug[subject]) {
+      this.$log.apply(this, [subject, ...args]);
     }
   },
 
@@ -164,8 +167,8 @@ const newenv = () => ({
     }
     this.$debug('wrap', fn);
     // don't set for name on function
-    let resfn = (() => (...args) => {
-      this.$debug('call wrapped fn', fn, args);
+    let resfn = (() => function(...args) {
+      this.$debug('wrap', 'call fn', fn, args);
       if (args[0] === 'unwrap') {
         return fn.apply(this, args.slice(1));
       } else {
@@ -416,7 +419,7 @@ return ${target};`;
     let closure = this;
     let resfn = (() => function(...passedArgs) {
       this.$debug('call vau', args, passedArgs);
-      let lambdaEnv = closure.$childenv();
+      let lambdaEnv = this.$childenv();
       lambdaEnv.hygenic = hygenic;
       let res = target.apply(lambdaEnv, passedArgs);
       return res;
@@ -463,6 +466,10 @@ return ${target};`;
   },
 
   stack: [],
+  $pushstack(f) {
+    this.$debug('pushstack', f)
+    this.stack.push(f);
+  },
   $eval(...form) {
     if (form.length === 1) {
       form = form[0];
@@ -472,8 +479,8 @@ return ${target};`;
       let operator = this.$eval(this.$car(form));
       let args = this.$cdr(form);
 
-      this.stack.push([this.$print(operator), this.$print(...args)])
-      let res = this.$combine(this.$eval(this.$car(form)), this.$cdr(form))
+      this.$pushstack([this.$name(operator) || 'anonymous', ...args])
+      let res = this.$combine(operator, args)
       this.stack.pop();
       this.$debug('eval', operator, ...args, '=', res)
       return res;
@@ -483,7 +490,6 @@ return ${target};`;
       }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
-        this.$log(this);
         throw new Error(`undefined ${form}`);
       }
       this.$debug('symbol', form, this[form.name]);
