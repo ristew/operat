@@ -9,11 +9,9 @@
  * applicatives are normal, operatives start with $
  */
 import util from 'util';
-import * as readline from 'readline';
 import process from 'process';
-import { readFileSync } from 'fs';
 
-class Symbol {
+export class OpSymbol {
   constructor(s) {
     this.name = s;
   }
@@ -26,7 +24,11 @@ class Symbol {
   }
 }
 
-const newenv = () => ({
+export function q(s) {
+  return new OpSymbol(s);
+}
+
+export const newenv = () => ({
   cons(a, b) {
     return this.$cons(a, b);
   },
@@ -146,7 +148,7 @@ const newenv = () => ({
       let name = this.$name(o);
       return `(${this.$vaup(o) ? '$vau' : '$lambda'} ${name})`;
     } else if (this.$mapp(o)) {
-      return `\n(map ${this.$printlist(Object.entries(o).map(([key, val]) => [new Symbol(key), val]))})\n`
+      return `\n(map ${this.$printlist(Object.entries(o).map(([key, val]) => [new OpSymbol(key), val]))})\n`
     } else if (this.$booleanp(o)) {
       return o;
     }
@@ -170,9 +172,15 @@ const newenv = () => ({
     }
     this.$debug('wrap', fn, name);
     // don't set for name on function
-    let resfn = (() => function(...args) {
+    let [resfn] = [function(...args) {
       return fn.apply(this, this.$mapeval(args));
-    })();
+    }];
+    // 10% slower?
+    // let resfn = new Proxy(fn, {
+    //   apply(target, thisArg, args) {
+    //     return target.apply(thisArg, thisArg.$mapeval(args));
+    //   }
+    // });
     resfn.vauname = name;
     resfn.wrapped = true;
     resfn.wrapfn = fn;
@@ -234,7 +242,7 @@ const newenv = () => ({
   },
 
   is(arg) {
-    return !this.nil('$', arg);
+    return !this.nil.wrapfn.apply(this, [arg]);
   },
 
   nil(arg) {
@@ -250,14 +258,15 @@ const newenv = () => ({
   },
 
   $symbol(s) {
-    return new Symbol(s);
+    return new OpSymbol(s);
   },
 
   $caris(form, name) {
-    return this.$listp(form) && this.$eq(this.$car(form), new Symbol(name));
+    return this.$listp(form) && this.$eq(this.$car(form), new OpSymbol(name));
   },
 
   $progn(...args) {
+    this.$debug('progn', args);
     let res;
     for (let statement of args) {
       res = this.$eval(statement);
@@ -427,21 +436,39 @@ return ${target};`;
     return this.$vau(args, body, name, false);
   },
 
+  $pullarg(name, args) {
+    this.$log('pullarg', name, args);
+
+    for (let i = 0; i < args.length; i++) {
+      let arg = args[i];
+      if (this.$caris(arg, name)) {
+        args.splice(i, 1);
+        return this.$cdr(arg);
+      }
+    }
+    return [];
+  },
+
   $vau(args, body, name = null, hygenic = true) {
+    let [doc] = this.$pullarg('doc', args);
+    this.$log('doc', doc);
     let target = this.$vaucomp(args, body, hygenic);
     this.$debug('vau', name, args, body, target);
-    let resfn = (() => function(...passedArgs) {
+    let [resfn] = [function(...passedArgs) {
       let lambdaEnv = this.$childenv();
       lambdaEnv.hygenic = hygenic;
       // this.$pushstack([name, ...passedArgs])
       let res = target.apply(lambdaEnv, passedArgs);
       // this.stack.pop();
       return res;
-    })();
+    }];
     resfn.vauname = name;
     resfn.args = args;
     resfn.body = body;
     resfn.hygenic = hygenic;
+    if (doc) {
+      resfn.doc = doc;
+    }
     return resfn;
   },
 
@@ -455,6 +482,17 @@ return ${target};`;
     } else {
       return 'none';
     }
+  },
+
+  run(code) {
+    this.$debug('run', code);
+    return this.$progn.apply(this, this.$parseToplevel(code));
+  },
+
+  jsrun(code) {
+    this.$debug('jsrun', code);
+    let body = code.indexOf("return") === -1 ? `return ${code}` : code;
+    return new Function('', body).apply(this, []);
   },
 
   $qt(s) {
@@ -502,7 +540,7 @@ return ${target};`;
       return res;
     } else if (this.$symbolp(form)) {
       if (form.name[0] === "'") {
-        return new Symbol(form.name.slice(1));
+        return new OpSymbol(form.name.slice(1));
       }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
@@ -557,7 +595,7 @@ return ${target};`;
   },
 
   $call(name, ...args) {
-    return this.$eval([new Symbol(name), ...args]);
+    return this.$eval([new OpSymbol(name), ...args]);
   },
 
   mapcar(l, fn) {
@@ -582,7 +620,7 @@ return ${target};`;
   $numberp: s => typeof s === 'number',
 
   $symbolp(s) {
-    return s instanceof Symbol;
+    return s instanceof OpSymbol;
   },
 
   $listp(s) {
@@ -625,7 +663,7 @@ return ${target};`;
         } else if (sym === 'true' || sym === 'false') {
           toks.push(JSON.parse(sym))
         } else {
-          toks.push(new Symbol(sym));
+          toks.push(new OpSymbol(sym));
         }
       }
     }
@@ -644,37 +682,3 @@ return ${target};`;
     }
   }
 });
-
-
-const example = readFileSync('./core.operat').toString();
-
-export let env = newenv();
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-
-let replEnv = env.$childenv();
-replEnv.hygenic = true;
-
-try {
-  env.$log('loading lisp base');
-  env.$progn.apply(env, env.$parseToplevel(example));
-} catch (e) {
-  env.$tryrecover(e, repl);
-}
-
-async function repl() {
-  rl.question('%% ', answer => {
-    try {
-      replEnv.$log(replEnv.$eval(replEnv.$parseToplevel(answer)[0]));
-      repl();
-    } catch (e) {
-      env.$tryrecover(e, repl);
-    }
-  })
-}
-
-repl();

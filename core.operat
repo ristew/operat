@@ -23,14 +23,23 @@
 ($macro $let (defs body)
   (eval (cons (~ $lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
 
+($macro $when (
+    cond ;; whether
+    body ;; to do
+    (doc "when this, do that")
+  )
+  ($if (eval cond)
+    (eval body)
+    false))
+
 ($macro $cond ((rest ifthens))
   ($let
-    ((head (car ifthens)))
+    ((head (car ifthens))
+     (tail (cdr ifthens)))
     ($if (eval (car head))
       (cadr head)
-      ($if (nil (cdr ifthens))
-        false
-        (apply $cond (cdr ifthens))))))
+      ($when (is tail)
+        (apply $cond tail)))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -61,7 +70,10 @@
     (* fibn factn)))
 (log (fibfact 10))
 
-(log (concat "cond "($cond
-  ((gt (fib 5) 150) "bad")
-  ((lt (fib 5) 150) "good")
-  (true "bad again"))))
+(log (concat "cond "
+  ($cond
+    ((gt (fib 5) 150) "bad")
+    ((lt (fib 5) 150) "good")
+    (true "bad again"))))
+(log (run "(+ 1 2)"))
+(log (jsrun "let n = 1; for (let i = 0; i < 10; i++) { n = (n + i) * 2; } return n"))
