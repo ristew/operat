@@ -111,7 +111,11 @@ const newenv = () => ({
     return map[key];
   },
 
-  $set(map, key, val) {
+  get(map, key) {
+    return map[key];
+  },
+
+  $mset(map, key, val) {
     return this.$eval(map)[key] = val;
   },
 
@@ -124,8 +128,7 @@ const newenv = () => ({
   },
 
   $vaup(fn) {
-    let name = this.$name(fn);
-    return name && (name[0] === '$' || name.indexOf('~$') === 0);
+    return !fn.wrapped;
   },
 
   $print(o) {
@@ -165,18 +168,14 @@ const newenv = () => ({
     if (typeof fn !== 'function') {
       throw new Error(`attempted to wrap a non-fn ${fn}`);
     }
-    this.$debug('wrap', fn);
+    this.$debug('wrap', fn, name);
     // don't set for name on function
     let resfn = (() => function(...args) {
-      this.$debug('wrap', 'call fn', fn, args);
-      if (args.length > 0 && args[0].toString() === '$') {
-        return fn.apply(this, args.slice(1));
-      } else {
-        return fn.apply(this, this.$mapeval(args));
-      }
+      return fn.apply(this, this.$mapeval(args));
     })();
     resfn.vauname = name;
     resfn.wrapped = true;
+    resfn.wrapfn = fn;
     return resfn;
   },
 
@@ -184,27 +183,21 @@ const newenv = () => ({
 
   hygenic: false,
 
+  // lexical scoping is this easy (without closures)
   $childenv() {
     let base = this;
-    let env = new Proxy({
+    return new Proxy({
       parent: base,
       level: base.level + 1,
     }, {
       get(obj, p) {
-        if (p instanceof Symbol) {
-          p = p.name;
-        }
-        if (p[0] === "'") {
-          return new Symbol(p.slice(1));
-        }
-        // lexical scoping is this easy
         if (p in obj) {
           return obj[p];
         } else if (obj.parent) {
           let lookup = obj.parent[p];
-          if (lookup instanceof Function) {
-            lookup.bind(env);
-          }
+          // TODO: debate the merits of lexical hoisting? whatever this is
+          // great for deeply nested recursive lookups, 3x faster for (fib 24)
+          obj[p] = lookup;
           return lookup;
         } else {
           throw new Error(`undefined ${p}`);
@@ -212,18 +205,10 @@ const newenv = () => ({
       },
 
       set(obj, p, val) {
-        if (p instanceof Symbol) {
-          p = p.name;
-        }
-        if (typeof p !== 'string') {
-          throw new Error(`set non-string in env ${p}`)
-        }
         obj[p] = val;
         return true;
       }
     });
-    this.$debug('childenv', env.level);
-    return env;
   },
 
   gt(a, b) {
@@ -239,10 +224,8 @@ const newenv = () => ({
   },
 
   $eq(a, b) {
-    if (this.$numberp(a)) {
-      return a === b
-    } else if (this.$symbolp(a) && this.$symbolp(b)) {
-      return this.$name(a) && this.$name(a) === this.$name(b);
+    if (this.$symbolp(a) && this.$symbolp(b)) {
+      return a.name === b.name;
     } else if (this.$listp(a) && this.$listp(b)) {
       return a.length === 0 && b.length === 0;
     } else {
@@ -255,7 +238,6 @@ const newenv = () => ({
   },
 
   nil(arg) {
-    this.$debug('nil', arg);
     if (this.$listp(arg)) {
       return arg.length === 0;
     } else {
@@ -289,10 +271,10 @@ const newenv = () => ({
 
   $set(symbol, value) {
     if (this.parent && !this.hygenic) {
-      this.$debug('$set up', symbol, '=', value, this.hygenic, this.level);
+      this.$debug('set', 'up', symbol, '=', value, this.hygenic, this.level);
       this.parent.$set(symbol, value);
     } else {
-      this.$debug('$set', symbol, value, this.hygenic, this.level);
+      this.$debug('set', symbol, value, this.hygenic, this.level);
       this[symbol.name] = value;
     }
     return value;
@@ -348,16 +330,22 @@ const newenv = () => ({
   },
 
   $compile(form) {
+    this.$debug('compile', form);
     if (this.$listp(form) && form.length > 0) {
       let op = this.$car(form);
       let comp = this[op.name + 'comp'];
       if (comp) {
         return comp.apply(this, this.$cdr(form));
       } else if (op.name && !op.name.includes('$')) {
-        return `${this.$compref(op)}('$', ${this.$mapcompile(this.$cdr(form))})`
+        this.$debug('compile', 'wrap', op);
+        return `${this.$compref(op)}.wrapfn.apply(this, [${this.$mapcompile(this.$cdr(form))}])`
+      } else if (op.name.includes('$')) {
+        return `${this.$compref(op)}.apply(this, ${this.$repr(this.$cdr(form))})`
       }
     } else if (this.$symbolp(form)) {
       return this.$compref(form);
+    } else if (this.$numberp(form)) {
+      return form;
     }
     return `this.$eval(${this.$repr(form)})`;
   },
@@ -395,12 +383,13 @@ const newenv = () => ({
   $cdrcomp(l) {
     return `${this.$compile(l)}.slice(1)`;
   },
-  listcomp(...args) {
-    return `[${this.$mapcompile(args).join(', ')}]`;
+  '~comp'(...args) {
+    return `${this.$compile(args[0])}(${this.$mapcompile(args.slice(1)).join(', ')})`;
   },
-  list(...args) {
-    return args;
+  '~'(...args) {
+    return [args[0], this.$mapeval(args.slice(1))];
   },
+
 
   concat(...args) {
     return args.join('');
@@ -423,12 +412,12 @@ const newenv = () => ({
     let target = this.$compile(body);
     const vauCode = `${args.map(arg => {
 let argname = this.$argname(arg);
-return `this['${argname}'] = ${argname};\n`;
+return `\nthis['${argname}'] = ${argname};\n`;
 }).join('')}
 return ${target};`;
     const vauArgs = this.$compileargs(args);
-    this.$debug('vaucomp', body, vauCode, args, vauArgs);
     vauArgs.push(vauCode);
+    this.$debug('vaucomp', body, vauArgs);
     return new Function(...vauArgs);
   },
   $uvaucomp(args, body) {
@@ -442,10 +431,11 @@ return ${target};`;
     let target = this.$vaucomp(args, body, hygenic);
     this.$debug('vau', name, args, body, target);
     let resfn = (() => function(...passedArgs) {
-      this.$debug('call vau', args, passedArgs);
       let lambdaEnv = this.$childenv();
       lambdaEnv.hygenic = hygenic;
+      // this.$pushstack([name, ...passedArgs])
       let res = target.apply(lambdaEnv, passedArgs);
+      // this.stack.pop();
       return res;
     })();
     resfn.vauname = name;
@@ -461,7 +451,7 @@ return ${target};`;
     if (fn.name) {
       return fn.name;
     } else if (fn.vauname) {
-      return fn.vauname.name;
+      return fn.vauname;
     } else {
       return 'none';
     }
@@ -491,34 +481,34 @@ return ${target};`;
 
   stack: [],
   $pushstack(f) {
-    this.$debug('pushstack', f)
     this.stack.push(f);
+  },
+  $stack() {
+    return this.stack.slice().reverse();
   },
   $eval(...form) {
     if (form.length === 1) {
       form = form[0];
     }
-    this.$debug('base eval', form);
+    // this.$log('eval', form);
     if (Array.isArray(form)) {
       let operator = this.$eval(this.$car(form));
       let args = this.$cdr(form);
 
-      this.$pushstack([this.$name(operator) || 'anonymous', ...args])
+      // this.$pushstack([this.$name(operator) || 'anonymous', ...args])
       let res = this.$combine(operator, args)
-      this.stack.pop();
-      this.$debug('eval', operator, ...args, '=', res)
+      // this.stack.pop();
+      // this.$debug('eval', operator, ...args, '=', res)
       return res;
     } else if (this.$symbolp(form)) {
       if (form.name[0] === "'") {
         return new Symbol(form.name.slice(1));
-      } else if (form.name[0] === "~") {
-        return this.wrap(new Symbol(form.name.slice(1)));
       }
       let sym = this[form.name];
       if (typeof sym === 'undefined') {
         throw new Error(`undefined ${form}`);
       }
-      this.$debug('symbol', form, this[form.name]);
+      // this.$debug('symbol', form, this[form.name]);
       return this[form.name];
     } else {
       return form;
@@ -526,16 +516,12 @@ return ${target};`;
   },
 
   $combine(c, ops) {
-    this.$debug('combine', c, ops);
+    // this.$debug('combine', c, ops);
     if (c instanceof Function) {
       return c.apply(this, ops);
     } else {
       throw new Error(`cannot combine ${JSON.stringify(c)}, ${JSON.stringify(ops)}`);
     }
-  },
-
-  list(...l) {
-    return l;
   },
 
   exit() {
@@ -575,7 +561,7 @@ return ${target};`;
   },
 
   mapcar(l, fn) {
-    this.$debug('mapcar', l, fn);
+    // this.$debug('mapcar', l, fn);
     return this.$mapcar(l, fn);
   },
 
@@ -584,14 +570,13 @@ return ${target};`;
   },
 
   $mapeval(l) {
-    this.$debug('$mapeval', l);
+    // this.$debug('$mapeval', l);
     return l.map(e => this.$eval(e));
   },
 
   apply(fn, args) {
-    let fnenv = this.$childenv(true);
-    this.$debug('apply', fn, args);
-    return fn.apply(fnenv, args);
+    // this.$debug('apply', fn, args);
+    return fn.apply(this, args);
   },
 
   $numberp: s => typeof s === 'number',
@@ -651,7 +636,7 @@ return ${target};`;
 
   $tryrecover(e, fn) {
     this.$log(e);
-    this.$log(this.stack.slice().reverse());
+    this.$log(this.$stack());
     if (this.recover) {
       fn();
     } else {
@@ -670,7 +655,9 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-let replEnv = env.$childenv(true);
+
+let replEnv = env.$childenv();
+replEnv.hygenic = true;
 
 try {
   env.$log('loading lisp base');

@@ -1,28 +1,27 @@
 ($wrapapplicatives)
-
 ($define $umacro
   ($uvau (name args body)
-    (~$define name (~$uvau args body name)) $umacro))
+    (~ $define name (~ $uvau args body name)) $umacro))
 
 ($define $macro
   ($uvau (name args body)
-    (~$define name (~$vau args body name)) $macro))
+    (~ $define name (~ $vau args body name)) $macro))
 
 ($macro $lambda (args body name)
-  (wrap (~$uvau args body) name))
+  (wrap (~ $uvau args body) name))
 
 ($umacro $function (name args body)
-  (~$define name (list $lambda args body name)))
+  (~ $define name (~ $lambda args body name)))
 
 ($umacro $comp (name args body)
-  (~$define (~$symextend name "comp") (~$vau args body)))
+  (~ $define (~ $symextend name "comp") (~ $vau args body)))
 
 ($macro $cadr (l) ($car ($cdr l)))
 
 ($function cadr (l) (car (cdr l)))
 
 ($macro $let (defs body)
-  (eval (cons (~$lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
+  (eval (cons (~ $lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
 
 ($macro $cond ((rest ifthens))
   ($let
@@ -37,7 +36,6 @@
   ($if (eq n 0)
     1
     (* n (fact (- n 1)))))
-(log (fact 10))
 
 ($function pow (n p)
   ($if (eq p 0)
@@ -45,24 +43,25 @@
     (* n (pow n (- p 1)))))
 
 ;; the slow way!
+(debug "vaucomp")
 ($function fib (n)
   ($if (lt n 2)
     1
     (+ (fib (- n 1)) (fib (- n 2)))))
+(cleardebug)
 
-;; ($logtime (nativefib 20))
-($logtime (fib 20))
-(log ($compile ($if (lt n 2)
-    1
-    (+ (fib (- n 1)) (fib (- n 2))))))
+($logtime (nativefib 24))
+
+($logtime (fib 24))
 
 ($function fibfact (n)
   ($let
     ((fibn (fib n))
      (factn (fact n)))
     (* fibn factn)))
-($logtime (fibfact 20))
+(log (fibfact 10))
 
 (log (concat "cond "($cond
+  ((gt (fib 5) 150) "bad")
   ((lt (fib 5) 150) "good")
-  ((gt (fib 5) 150) "bad"))))
+  (true "bad again"))))
