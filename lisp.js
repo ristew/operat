@@ -176,6 +176,7 @@ export const newenv = () => ({
       return fn.apply(this, this.$mapeval(args));
     }];
     // 10% slower?
+    // do for everything???
     // let resfn = new Proxy(fn, {
     //   apply(target, thisArg, args) {
     //     return target.apply(thisArg, thisArg.$mapeval(args));
@@ -275,7 +276,7 @@ export const newenv = () => ({
   },
 
   nativefib(n) {
-    return (n < 2) ? (1) : (this.nativefib(n - 1) + this.nativefib(n - 2));
+    return (n < 2) ? (n) : (this.nativefib(n - 1) + this.nativefib(n - 2));
   },
 
   $set(symbol, value) {
@@ -437,7 +438,7 @@ return ${target};`;
   },
 
   $pullarg(name, args) {
-    this.$log('pullarg', name, args);
+    this.$debug('pullarg', name, args);
 
     for (let i = 0; i < args.length; i++) {
       let arg = args[i];
@@ -451,7 +452,6 @@ return ${target};`;
 
   $vau(args, body, name = null, hygenic = true) {
     let [doc] = this.$pullarg('doc', args);
-    this.$log('doc', doc);
     let target = this.$vaucomp(args, body, hygenic);
     this.$debug('vau', name, args, body, target);
     let [resfn] = [function(...passedArgs) {
