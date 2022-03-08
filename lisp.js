@@ -28,7 +28,67 @@ export function q(s) {
   return new OpSymbol(s);
 }
 
+function coerce(form) {
+  function into(type, value = form) {
+    return {
+      type,
+      value,
+    }
+  }
+  if (form.hasOwnProperty('type') && form.hasOwnProperty('value')) {
+    return form;
+  } else if (Array.isArray(form)) {
+    return into('list', form.map(s));
+  } else if (typeof form === 'string') {
+    if (form.length > 0 && form[0] === '#') {
+      return into('string', form.slice(1));
+    } else {
+      return into('symbol');
+    }
+  } else if (typeof form === 'number') {
+    return into('number');
+  } else if (typeof form === 'boolean') {
+    return into('boolean');
+  } else {
+    console.log('no coercion?', form);
+  }
+}
+
+function s(exp) {
+  return new Proxy(coerce(exp), {
+    // thisArg.target(...args)
+    apply(target, thisArg, args) {
+      if (target.type === 'list') {
+        function wrapArgs() {
+          if (target.wrapped) {
+            return args.map(arg => arg());
+          } else {
+            return args;
+          }
+        }
+        return thisArg.$eval.apply(thisArg, wrapArgs(args))
+      } else if (target.type === 'symbol') {
+        return thisArg[target.value];
+      } else {
+        return target;
+      }
+    }
+  });
+}
+
+function stest() {
+  return s(['+', 1, ['*', 2, 3]]);
+}
+
+let op = stest();
+
+console.log(op);
+console.log(op());
+process.exit(0);
+
 export const newenv = () => ({
+  // translate a javascript representation into a semantically altered object with Proxy
+
   cons(a, b) {
     return this.$cons(a, b);
   },
@@ -148,7 +208,7 @@ export const newenv = () => ({
       let name = this.$name(o);
       return `(${this.$vaup(o) ? '$vau' : '$lambda'} ${name})`;
     } else if (this.$mapp(o)) {
-      return `\n(map ${this.$printlist(Object.entries(o).map(([key, val]) => [new OpSymbol(key), val]))})\n`
+      return `\n(map ${this.$printlist(Object.entries(o))})\n`
     } else if (this.$booleanp(o)) {
       return o;
     }
@@ -256,10 +316,6 @@ export const newenv = () => ({
 
   $symextend(...args) {
     return this.$symbol(args.join(''));
-  },
-
-  $symbol(s) {
-    return new OpSymbol(s);
   },
 
   $caris(form, name) {
@@ -566,13 +622,13 @@ return ${target};`;
     process.exit(0);
   },
 
-  $parseToplevel(s) {
-    let toks = this.$tokenize(s);
+  $parseToplevel(source) {
+    let toks = this.$tokenize(source);
     let p = [];
     while (toks.length > 0) {
       p.push(this.$readTokens(toks));
     }
-    return p;
+    return s(p);
   },
 
   $readTokens(toks) {
@@ -586,11 +642,11 @@ return ${target};`;
         sexp.push(this.$readTokens(toks));
       }
       toks.shift();
-      return sexp;
+      return s(sexp);
     } else if (token === ')') {
       throw new Error('unexpected )');
     } else {
-      return token;
+      return s(token);
     }
   },
 
@@ -649,7 +705,7 @@ return ${target};`;
           str += s[i];
           i++;
         }
-        toks.push(str);
+        toks.push('#' + str);
       } else {
         let sym = '';
         while (s[i] && /[^ \n\t();"]/.test(s[i])) {
@@ -663,7 +719,7 @@ return ${target};`;
         } else if (sym === 'true' || sym === 'false') {
           toks.push(JSON.parse(sym))
         } else {
-          toks.push(new OpSymbol(sym));
+          toks.push(sym);
         }
       }
     }

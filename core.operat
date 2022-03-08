@@ -78,3 +78,5 @@
     (true "bad again"))))
 (log (run "(+ (fact 5) 7)"))
 (log (jsrun "let n = 1; for (let i = 0; i < 10; i++) { n = (n + i) * 2; } return n"))
+
+(log (stest))
