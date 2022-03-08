@@ -9,23 +9,26 @@
 ($macro $lambda (args body name)
   (wrap (~ $uvau args body) name))
 
+(log ($lambda (n) (* n 2)))
+
 ($umacro $function (name args body)
   (~ $define name (~ $lambda args body name)))
 
 ($macro $comp (name args body)
   (list 'set name 'comp (~ $lambda args body)))
 
-($comp * (a b)
-  (concat ($compile a) " * " ($compile b)))
+;($comp * (a b)
+;  (concat (~ $compile a) " * " (~ $compile b)))
 
-(log (get '* 'comp))
+;(log (get '* 'comp))
 
 ($macro $cadr (l) ($car ($cdr l)))
 
 ($function cadr (l) (car (cdr l)))
 
+;; broken
 ($macro $let (defs body)
-  (eval (cons (~ $lambda (mapcar defs $car) body 'letbody) (mapcar defs $cadr))))
+  (~ $eval (cons (~ $lambda (map defs $car) body 'letbody) (map defs $cadr))))
 
 ($macro $when (
     cond ;; whether
@@ -41,9 +44,10 @@
     ((head (car ifthens))
      (tail (cdr ifthens)))
     ($if (eval (car head))
-      (cadr head)
-      ($when (is tail)
-        (apply $cond tail)))))
+      (eval (cadr head))
+      ($if (is tail)
+        (apply $cond tail)
+        false))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -56,17 +60,15 @@
     (* n (pow n (- p 1)))))
 
 ;; the slow way!
-(debug "vaucomp")
-
 ($function fib (n)
   ($if (lt n 2)
     n
     (+ (fib (- n 1)) (fib (- n 2)))))
-(cleardebug)
 
-($logtime (nativefib 24))
+($logtime (_nativefib 24))
 
 ($logtime (fib 24))
+(exit)
 
 ($function fibfact (n)
   ($let

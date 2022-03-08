@@ -1,7 +1,7 @@
 import * as readline from 'readline';
 import { newenv } from './lisp.js';
 import { readFileSync } from 'fs';
-const example = readFileSync('./core.operat').toString();
+const core = readFileSync('./core.operat').toString();
 
 export let env = newenv();
 
@@ -11,23 +11,23 @@ const rl = readline.createInterface({
 });
 
 
-let replEnv = env._childenv();
+let replEnv = env.$childenv._();
 replEnv.hygenic = true;
 
 try {
   env.$log('loading lisp base');
-  env.$progn.apply(env, env.$parseToplevel(example));
+  env.$run._(core);
 } catch (e) {
-  env._tryrecover(e, repl);
+  env.$tryrecover(e, repl);
 }
 
 async function repl() {
   rl.question('%% ', answer => {
     try {
-      replEnv.$log(replEnv.$eval(replEnv.$parseToplevel(answer)[0]));
+      replEnv.$log._(replEnv.$eval._(replEnv.$parseToplevel._(answer)[0]));
       repl();
     } catch (e) {
-      env._tryrecover(e, repl);
+      env.$tryrecover._(e, repl);
     }
   })
 }

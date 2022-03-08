@@ -28,6 +28,10 @@ export function q(s) {
   return new OpSymbol(s);
 }
 
+export function isvau(fname) {
+  return fname.length > 0 && /[\$~]/.test(fname[0]);
+}
+
 export function newenv() {
   let env = {
     cons(a, b) {
@@ -88,7 +92,7 @@ export function newenv() {
       }
     },
 
-    $map(...bindings) {
+    $obj(...bindings) {
       let m = {};
       for (let binding of bindings) {
         let name = binding[0];
@@ -110,7 +114,7 @@ export function newenv() {
       return this.$eval(map)[key] = val;
     },
 
-    $mapp(m) {
+    $objp(m) {
       return m && typeof m === 'object';
     },
 
@@ -119,26 +123,26 @@ export function newenv() {
     },
 
     $vaup(fn) {
-      return !fn.wrapped;
+      return isvau(this.$name(fn));
     },
 
     $print(o) {
       if (o instanceof Error) {
         return o.stack;
-      } else if (this.$symbolp(o)) {
+      } else if (this.$symbolp._(o)) {
         return o.name;
-      } else if (this.$numberp(o)) {
+      } else if (this.$numberp._(o)) {
         return o;
-      } else if (this.$stringp(o)) {
+      } else if (this.$stringp._(o)) {
         return `${o}`;
-      } else if (this.$listp(o)) {
-        return `(${this.$printlist(o)})`;
-      } else if (this.$functionp(o)) {
-        let name = this.$name(o);
-        return `(${this.$vaup(o) ? '$vau' : '$lambda'} ${name})`;
-      } else if (this.$mapp(o)) {
-        return `\n(map ${this.$printlist(Object.entries(o).map(([key, val]) => [new OpSymbol(key), val]))})\n`
-      } else if (this.$booleanp(o)) {
+      } else if (this.$listp._(o)) {
+        return `(${this.$printlist._(o)})`;
+      } else if (this.$functionp._(o)) {
+        let name = this.$name._(o);
+        return `(${this.$vaup._(o) ? '$vau' : '$lambda'} ${name})`;
+      } else if (this.$objp._(o)) {
+        return `\n(obj ${this.$printlist._(Object.entries(o).map(([key, val]) => [new OpSymbol(key), val]))})\n`
+      } else if (this.$booleanp._(o)) {
         return o;
       }
     },
@@ -151,41 +155,39 @@ export function newenv() {
       return typeof s === 'string';
     },
 
-    $fn(fn, name, wrap = false, hygenic = true) {
-      this.$log('$fn', fn, name, wrap, hygenic);
+    _fn(fn, name, wrap = false, hygenic = true) {
+      // this.$log('fn', fn, name, wrap, hygenic);
       let pfn = new Proxy(fn, {
         apply(target, thisArg, args) {
-          let lambdaEnv = thisArg._childenv();
+          let lambdaEnv = thisArg.$childenv._();
           lambdaEnv.hygenic = hygenic;
-          // no mechanics vau shortcut
           function wrapArgs() {
-            if (wrap) {
-              return thisArg.$mapeval('_', args);
+            if (args.length > 0 && args[0] === '$') {
+              return args.slice(1);
+            } else if (wrap) {
+              return thisArg.$mapeval._(args);
             } else {
               return args;
             }
           }
           let wargs = wrapArgs(args);
-          console.log('fnapply', name, args, wargs);
-          thisArg._pushstack('_', [name, wargs]);
-          target.apply(lambdaEnv, wargs);
-          thisArg._popstack();
+          thisArg.$pushstack._([name, ...wargs]);
+          let res = target.apply(lambdaEnv, wargs);
+          thisArg.$popstack._();
+          return res;
         },
       });
-      console.log(pfn);
+      pfn.fname = name?.toString();
+      pfn._ = fn.bind(this);
       return pfn;
     },
 
     wrap(fn, name) {
-      return this.$wrap(fn, name);
-    },
-
-    $wrap(fn, name) {
       if (typeof fn !== 'function') {
         throw new Error(`attempted to wrap a non-fn ${fn}`);
       }
       this.$debug('wrap', fn, name);
-      let resfn = this.$fn(fn, name, true, fn.hygenic);
+      let resfn = this._fn(fn, name, true, fn.hygenic);
       // 10% slower?
       // do for everything???
       // let resfn = new Proxy(fn, {
@@ -201,7 +203,7 @@ export function newenv() {
     hygenic: false,
 
     // lexical scoping is this easy (without closures)
-    _childenv() {
+    $childenv() {
       let base = this;
       return new Proxy({
         parent: base,
@@ -283,14 +285,14 @@ export function newenv() {
       return res;
     },
 
-    nativefib(n) {
-      return (n < 2) ? (n) : (this.nativefib(n - 1) + this.nativefib(n - 2));
+    _nativefib(n) {
+      return (n < 2) ? (n) : (this._nativefib(n - 1) + this._nativefib(n - 2));
     },
 
     $set(symbol, value) {
       if (this.parent && !this.hygenic) {
         this.$debug('set', 'up', symbol, '=', value, this.hygenic, this.level);
-        this.parent.$set(symbol, value);
+        this.parent.$set._(symbol, value);
       } else {
         this.$debug('set', symbol, value, this.hygenic, this.level);
         this[symbol.name] = value;
@@ -300,7 +302,7 @@ export function newenv() {
 
     $define(symbol, value) {
       let val = this.$eval(value);
-      this.$debug('define', symbol, val);
+      // this.$log('define', symbol, val);
       if (typeof val === 'undefined') {
         throw new Error(`attempt to define ${symbol} to undefined!`);
       }
@@ -343,22 +345,37 @@ export function newenv() {
       return res;
     },
 
-    $compref(s) {
-      return `this['${s.name.replace(/'/g, "\\'")}']`;
+    $jsident(s) {
+      return /^[a-zA-Z$_\d]+$/.test(s);
     },
 
-    $compile(form) {
+    $compref(s) {
+      let n = s.toString();
+      if (this.$jsident._(n)) {
+        return `this.${n}`;
+      } else {
+        return `this['${n.replace(/'/g, "\\'")}']`;
+      }
+    },
+
+    $compile(form, trace = true) {
       this.$debug('compile', form);
       if (this.$listp(form) && form.length > 0) {
         let op = this.$car(form);
-        let comp = this[op.name + 'comp'];
+        let comp = this[op]?.comp || this.nativecomps[op.name + 'comp'];
         if (comp) {
           return comp.apply(this, this.$cdr(form));
-        } else if (op.name && !op.name.includes('$')) {
-          this.$debug('compile', 'wrap', op);
-          return `${this.$compref(op)}('$', ${this.$mapcompile(this.$cdr(form))})`
-        } else if (op.name.includes('$')) {
-          return `${this.$compref(op)}.apply(this, ${this.$repr(this.$cdr(form))})`
+        } else if (op.name) {
+          if (!isvau(op.name)) {
+            // this.$log('compile', 'wrap', op);
+            if (trace) {
+              return `${this.$compref(op)}('$', ${this.$mapcompile(this.$cdr(form))})`
+            } else {
+              return `${this.$compref(op)}._(${this.$mapcompile(this.$cdr(form))})`
+            }
+          } else {
+            return `${this.$compref(op)}(${this.$repr(this.$cdr(form))})`
+          }
         }
       } else if (this.$symbolp(form)) {
         return this.$compref(form);
@@ -417,14 +434,10 @@ export function newenv() {
       '/comp': function(a, b) {
         return `${this.$compile(a)} / ${this.$compile(b)}`;
       },
-      $uvaucomp(args, body) {
-        return this.$vaucomp(args, body, false);
-      },
     },
     '~'(...args) {
-      return [args[0], this.$mapeval(args.slice(1))];
+      return this.$eval([args[0], ...this.$mapeval(args.slice(1))]);
     },
-
 
     concat(...args) {
       return args.join('');
@@ -436,10 +449,10 @@ export function newenv() {
     },
 
     $argname(arg) {
-      if (this.$symbolp(arg)) {
+      if (this.$symbolp._(arg)) {
         return arg;
-      } else if (this.$caris(arg, 'rest')) {
-        return this.$car(this.$cdr(arg));
+      } else if (this.$caris._(arg, 'rest')) {
+        return this.$car._(this.$cdr._(arg));
       }
     },
 
@@ -460,6 +473,7 @@ export function newenv() {
       return [];
     },
     $transvau(args, body) {
+      // this.$log('transvau', args, body);
       let target = this.$compile(body);
       const vauCode = `${args.map(arg => {
         let argname = this.$argname(arg);
@@ -468,7 +482,7 @@ export function newenv() {
 return ${target};`;
       const vauArgs = this.$compileargs(args);
       vauArgs.push(vauCode);
-      this.$debug('vaucomp', body, vauArgs);
+      this.$debug('transvau', body, vauArgs);
       return new Function(...vauArgs);
     },
 
@@ -476,28 +490,20 @@ return ${target};`;
       let [doc] = this.$pullarg('doc', args);
       let target = this.$transvau(args, body, hygenic);
       this.$debug('vau', name, args, body, target);
-      let resfn = this.$fn(target, name, false, hygenic);
+      let resfn = this._fn(target, name, false, hygenic);
       if (doc) {
         resfn.doc = doc;
       }
       return resfn;
     },
 
-    // naming functions with Object.defineProperty makes them slower
-    // see https://humanwhocodes.com/blog/2015/11/performance-implication-object-defineproperty/
     $name(fn) {
-      if (fn.name) {
-        return fn.name;
-      } else if (fn.vauname) {
-        return fn.vauname;
-      } else {
-        return 'none';
-      }
+      return fn.fname || 'anonymous';
     },
 
-    run(code) {
+    $run(code) {
       this.$debug('run', code);
-      return this.$progn.apply(this, this.$parseToplevel(code));
+      this.$parseToplevel(code).forEach(f => this.$eval(f));
     },
 
     jsrun(code) {
@@ -514,16 +520,13 @@ return ${target};`;
       return this.$eval(...form);
     },
 
-    _boot() {
+    $boot() {
       for (let fname in this) {
         const fn = this[fname];
         if (typeof fn === 'function' && fname[0] !== '_') {
           console.log('boot', fname);
-          let wrap = fn.name[0] !== '$';
-          this[fname] = this.$fn(fn, fname, wrap, false);
-          if (!wrap) {
-            this['_' + fname.slice(1)] = fn;
-          }
+          let wrap = !isvau(fname);
+          this[fname] = this._fn(fn, fname, wrap, false);
           if (this.nativecomps[fname]) {
             this[fname].comp = this.nativecomps[fname];
           }
@@ -532,13 +535,13 @@ return ${target};`;
     },
 
     stack: [],
-    _pushstack(f) {
+    $pushstack(f) {
       this.stack.push(f);
     },
-    _popstack() {
+    $popstack() {
       this.stack.pop();
     },
-    _stack() {
+    $stack() {
       return this.stack.slice().reverse();
     },
     $eval(...form) {
@@ -547,15 +550,15 @@ return ${target};`;
       }
       // this.$log('eval', form);
       if (Array.isArray(form)) {
-        let operator = this.$eval(this.$car(form));
-        let args = this.$cdr(form);
+        let operator = this.$eval._(this.$car._(form));
+        let args = this.$cdr._(form);
 
         // this.$pushstack([this.$name(operator) || 'anonymous', ...args])
-        let res = this.$combine(operator, args)
+        let res = this.$combine._(operator, args)
         // this.stack.pop();
         // this.$debug('eval', operator, ...args, '=', res)
         return res;
-      } else if (this.$symbolp(form)) {
+      } else if (this.$symbolp._(form)) {
         if (form.name[0] === "'") {
           return new OpSymbol(form.name.slice(1));
         }
@@ -572,11 +575,7 @@ return ${target};`;
 
     $combine(c, ops) {
       // this.$debug('combine', c, ops);
-      if (c instanceof Function) {
-        return c.apply(this, ops);
-      } else {
-        throw new Error(`cannot combine ${JSON.stringify(c)}, ${JSON.stringify(ops)}`);
-      }
+      return c.apply(this, ops);
     },
 
     exit() {
@@ -612,21 +611,21 @@ return ${target};`;
     },
 
     $call(name, ...args) {
-      return this.$eval([new OpSymbol(name), ...args]);
+      return this.$eval._([new OpSymbol(name), ...args]);
     },
 
-    mapcar(l, fn) {
+    map(l, fn) {
       // this.$debug('mapcar', l, fn);
-      return this.$mapcar(l, fn);
+      return this.$map._(l, fn);
     },
 
-    $mapcar(l, fn) {
-      return l.map(e => this.$combine(fn, [e]));
+    $map(l, fn) {
+      return l.map(e => this.$combine._(fn, [e]));
     },
 
     $mapeval(l) {
       // this.$debug('$mapeval', l);
-      return l.map(e => this.$eval(e));
+      return this.$map._(l, this.$eval._);
     },
 
     apply(fn, args) {
@@ -689,9 +688,10 @@ return ${target};`;
 
     recover: true,
 
-    _tryrecover(e, fn) {
+    $tryrecover(e, fn) {
       console.log(e);
-      console.log(this._print(this._stack()));
+      let stack = this.$stack._();
+      console.log(stack.map(f => this.$print._(f)).join('\n'));
       if (this.recover) {
         fn();
       } else {
@@ -699,6 +699,6 @@ return ${target};`;
       }
     }
   };
-  env._boot();
+  env.$boot();
   return env;
 }
