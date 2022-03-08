@@ -11,14 +11,14 @@ const rl = readline.createInterface({
 });
 
 
-let replEnv = env.$childenv();
+let replEnv = env._childenv();
 replEnv.hygenic = true;
 
 try {
   env.$log('loading lisp base');
   env.$progn.apply(env, env.$parseToplevel(example));
 } catch (e) {
-  env.$tryrecover(e, repl);
+  env._tryrecover(e, repl);
 }
 
 async function repl() {
@@ -27,7 +27,7 @@ async function repl() {
       replEnv.$log(replEnv.$eval(replEnv.$parseToplevel(answer)[0]));
       repl();
     } catch (e) {
-      env.$tryrecover(e, repl);
+      env._tryrecover(e, repl);
     }
   })
 }

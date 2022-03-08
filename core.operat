@@ -1,4 +1,3 @@
-($wrapapplicatives)
 ($define $umacro
   ($uvau (name args body)
     (~ $define name (~ $uvau args body name)) $umacro))
@@ -14,10 +13,12 @@
   (~ $define name (~ $lambda args body name)))
 
 ($macro $comp (name args body)
-  (set name 'comp (~ $vau args body)))
+  (list 'set name 'comp (~ $lambda args body)))
 
 ($comp * (a b)
   (concat ($compile a) " * " ($compile b)))
+
+(log (get '* 'comp))
 
 ($macro $cadr (l) ($car ($cdr l)))
 
