@@ -13,8 +13,11 @@
 ($umacro $function (name args body)
   (~ $define name (~ $lambda args body name)))
 
-($umacro $comp (name args body)
-  (~ $define (~ $symextend name "comp") (~ $vau args body)))
+($macro $comp (name args body)
+  (set name 'comp (~ $vau args body)))
+
+($comp * (a b)
+  (concat ($compile a) " * " ($compile b)))
 
 ($macro $cadr (l) ($car ($cdr l)))
 
