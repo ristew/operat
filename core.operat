@@ -1,3 +1,5 @@
+(debug "vau")
+(debug "transvau")
 ($define $umacro
   ($uvau (name args body)
     (~ $define name (~ $uvau args body name)) $umacro))
@@ -9,7 +11,7 @@
 ($macro $lambda (args body name)
   (wrap (~ $uvau args body) name))
 
-(log ($lambda (n) (* n 2)))
+(log (($lambda (n) (* n 2)) 4))
 
 ($umacro $function (name args body)
   (~ $define name (~ $lambda args body name)))
@@ -28,7 +30,13 @@
 
 ;; broken
 ($macro $let (defs body)
-  (~ $eval (cons (~ $lambda (map defs $car) body 'letbody) (map defs $cadr))))
+   (~ $eval (cons (~ $lambda (map defs $car) body) (~ $mapeval (map defs $cadr)))))
+($function lettest (c)
+  (progn
+    (log c)
+    ($let ((a 3) (b (+ 2 c))) (* a b))))
+
+(log (lettest 5))
 
 ($macro $when (
     cond ;; whether
@@ -68,12 +76,11 @@
 ($logtime (_nativefib 24))
 
 ($logtime (fib 24))
-(exit)
 
 ($function fibfact (n)
   ($let
     ((fibn (fib n))
-     (factn (fact n)))
+    (factn (fact n)))
     (* fibn factn)))
 (log (fibfact 10))
 

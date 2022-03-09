@@ -182,19 +182,16 @@ export function newenv() {
       return pfn;
     },
 
+    $nlet(defs, body) {
+      return this.$eval(this.$lambda(defs, body));
+    },
+
     wrap(fn, name) {
       if (typeof fn !== 'function') {
         throw new Error(`attempted to wrap a non-fn ${fn}`);
       }
       this.$debug('wrap', fn, name);
       let resfn = this._fn(fn, name, true, fn.hygenic);
-      // 10% slower?
-      // do for everything???
-      // let resfn = new Proxy(fn, {
-      //   apply(target, thisArg, args) {
-      //     return target.apply(thisArg, thisArg.$mapeval(args));
-      //   }
-      // });
       return resfn;
     },
 
@@ -330,7 +327,7 @@ export function newenv() {
       if (this.$symbolp(form)) {
         return `this.$symbol(${this.$repr(form.name)})`;
       } else if (this.$listp(form)) {
-        return `[${form.map(e => this.$repr(e)).join(', ')}]`
+        return `${form.map(e => this.$repr(e)).join(', ')}`
       } else if (this.$stringp(form)) {
         return `'${form.replace(/'/g, "\\'")}'`;
       } else {
@@ -371,10 +368,10 @@ export function newenv() {
             if (trace) {
               return `${this.$compref(op)}('$', ${this.$mapcompile(this.$cdr(form))})`
             } else {
-              return `${this.$compref(op)}._(${this.$mapcompile(this.$cdr(form))})`
+              return `${this.$compref(op)}(${this.$mapcompile(this.$cdr(form))})`
             }
           } else {
-            return `${this.$compref(op)}(${this.$repr(this.$cdr(form))})`
+            return `${this.$compref(op)}.apply(this, ${this.$repr(this.$cdr(form))})`
           }
         }
       } else if (this.$symbolp(form)) {
@@ -420,7 +417,8 @@ export function newenv() {
         return `${this.$compile(l)}.slice(1)`;
       },
       '~comp'(...args) {
-        return `${this.$compile(args[0])}(${this.$mapcompile(args.slice(1)).join(', ')})`;
+        return `${this.$compile(args[0])}.apply(this, [${this.$mapcompile(args.slice(1)).join(', ')}])`;
+        //return `[${this.$repr(args[0])}, ${this.$mapcompile(args)}]`;
       },
       '+comp': function(a, b) {
         return `${this.$compile(a)} + ${this.$compile(b)}`;
@@ -457,7 +455,7 @@ export function newenv() {
     },
 
     $uvau(args, body, name = null) {
-      return this.$vau(args, body, name, false);
+      return this.$vau._(args, body, name, false);
     },
 
     $pullarg(name, args) {
@@ -474,23 +472,25 @@ export function newenv() {
     },
     $transvau(args, body) {
       // this.$log('transvau', args, body);
-      let target = this.$compile(body);
+      let target = this.$compile._(body);
       const vauCode = `${args.map(arg => {
-        let argname = this.$argname(arg);
+        let argname = this.$argname._(arg);
         return `\nthis['${argname}'] = ${argname};\n`;
       }).join('')}
 return ${target};`;
-      const vauArgs = this.$compileargs(args);
+      const vauArgs = this.$compileargs._(args);
       vauArgs.push(vauCode);
       this.$debug('transvau', body, vauArgs);
       return new Function(...vauArgs);
     },
 
     $vau(args, body, name = null, hygenic = true) {
-      let [doc] = this.$pullarg('doc', args);
-      let target = this.$transvau(args, body, hygenic);
+      let [doc] = this.$pullarg._('doc', args);
+      let target = this.$transvau._(args, body, hygenic);
       this.$debug('vau', name, args, body, target);
       let resfn = this._fn(target, name, false, hygenic);
+      resfn.args = args;
+      resfn.body = body;
       if (doc) {
         resfn.doc = doc;
       }
@@ -499,6 +499,10 @@ return ${target};`;
 
     $name(fn) {
       return fn.fname || 'anonymous';
+    },
+
+    run(code) {
+      return this.$run(code);
     },
 
     $run(code) {
@@ -620,7 +624,7 @@ return ${target};`;
     },
 
     $map(l, fn) {
-      return l.map(e => this.$combine._(fn, [e]));
+      return (l || []).map(e => fn.apply(this, [e]));
     },
 
     $mapeval(l) {
@@ -641,6 +645,14 @@ return ${target};`;
 
     $listp(s) {
       return Array.isArray(s);
+    },
+
+    list(...args) {
+      return args;
+    },
+
+    $(...args) {
+      return args;
     },
 
     $functionp(f) {
@@ -692,6 +704,7 @@ return ${target};`;
       console.log(e);
       let stack = this.$stack._();
       console.log(stack.map(f => this.$print._(f)).join('\n'));
+      this.$popstack._();
       if (this.recover) {
         fn();
       } else {
