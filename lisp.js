@@ -159,21 +159,21 @@ export function newenv() {
       // this.$log('fn', fn, name, wrap, hygenic);
       let pfn = new Proxy(fn, {
         apply(target, thisArg, args) {
-          let lambdaEnv = thisArg.$childenv._();
+          let lambdaEnv = thisArg.$childenv._(thisArg);
           lambdaEnv.hygenic = hygenic;
           function wrapArgs() {
             if (args.length > 0 && args[0] === '$') {
               return args.slice(1);
             } else if (wrap) {
-              return thisArg.$mapeval._(args);
+              return args.map(arg => lambdaEnv.$eval('$', arg));
             } else {
               return args;
             }
           }
           let wargs = wrapArgs(args);
-          thisArg.$pushstack._([name, ...wargs]);
+          lambdaEnv.$pushstack._([name, ...wargs]);
           let res = target.apply(lambdaEnv, wargs);
-          thisArg.$popstack._();
+          lambdaEnv.$popstack._();
           return res;
         },
       });
@@ -182,8 +182,14 @@ export function newenv() {
       return pfn;
     },
 
-    $nlet(defs, body) {
-      return this.$eval(this.$lambda(defs, body));
+    $let(defs, body) {
+      this.$debug('let', defs, body);
+      let childenv = this.$childenv(this);
+      childenv.hygenic = true;
+      for (let def of defs) {
+        childenv[def[0]] = childenv.$eval(def[1]);
+      }
+      return childenv.$eval(body);
     },
 
     wrap(fn, name) {
@@ -200,8 +206,7 @@ export function newenv() {
     hygenic: false,
 
     // lexical scoping is this easy (without closures)
-    $childenv() {
-      let base = this;
+    $childenv(base = this) {
       return new Proxy({
         parent: base,
         level: base.level + 1,
@@ -323,11 +328,12 @@ export function newenv() {
       return l.map(e => this.$compile(e));
     },
 
-    $repr(form) {
+    $repr(form, bracket = true) {
       if (this.$symbolp(form)) {
         return `this.$symbol(${this.$repr(form.name)})`;
       } else if (this.$listp(form)) {
-        return `${form.map(e => this.$repr(e)).join(', ')}`
+        const [ob, eb] = bracket ? ['[', ']'] : ['', ''];
+        return `${ob}${form.map(e => this.$repr(e)).join(', ')}${eb}`
       } else if (this.$stringp(form)) {
         return `'${form.replace(/'/g, "\\'")}'`;
       } else {
@@ -371,7 +377,7 @@ export function newenv() {
               return `${this.$compref(op)}(${this.$mapcompile(this.$cdr(form))})`
             }
           } else {
-            return `${this.$compref(op)}.apply(this, ${this.$repr(this.$cdr(form))})`
+            return `${this.$compref(op)}(${this.$repr(this.$cdr(form), false)})`
           }
         }
       } else if (this.$symbolp(form)) {
@@ -473,11 +479,16 @@ export function newenv() {
     $transvau(args, body) {
       // this.$log('transvau', args, body);
       let target = this.$compile._(body);
+      function transvaudebug(ag) {
+        if (false) {
+          return `console.log('set ${ag} = ', this['${ag}'])\n`;
+        }
+      }
       const vauCode = `${args.map(arg => {
         let argname = this.$argname._(arg);
-        return `\nthis['${argname}'] = ${argname};\n`;
+        return `\nthis['${argname}'] = ${argname};\n${transvaudebug(argname)}`;
       }).join('')}
-return ${target};`;
+return ${target}`;
       const vauArgs = this.$compileargs._(args);
       vauArgs.push(vauCode);
       this.$debug('transvau', body, vauArgs);
@@ -486,8 +497,8 @@ return ${target};`;
 
     $vau(args, body, name = null, hygenic = true) {
       let [doc] = this.$pullarg._('doc', args);
+      this.$debug('vau', name, args, body);
       let target = this.$transvau._(args, body, hygenic);
-      this.$debug('vau', name, args, body, target);
       let resfn = this._fn(target, name, false, hygenic);
       resfn.args = args;
       resfn.body = body;
@@ -558,7 +569,7 @@ return ${target};`;
         let args = this.$cdr._(form);
 
         // this.$pushstack([this.$name(operator) || 'anonymous', ...args])
-        let res = this.$combine._(operator, args)
+        let res = this.$combine(operator, args)
         // this.stack.pop();
         // this.$debug('eval', operator, ...args, '=', res)
         return res;
@@ -698,7 +709,7 @@ return ${target};`;
       return toks;
     },
 
-    recover: true,
+    recover: false,
 
     $tryrecover(e, fn) {
       console.log(e);

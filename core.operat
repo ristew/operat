@@ -1,5 +1,3 @@
-(debug "vau")
-(debug "transvau")
 ($define $umacro
   ($uvau (name args body)
     (~ $define name (~ $uvau args body name)) $umacro))
@@ -28,15 +26,10 @@
 
 ($function cadr (l) (car (cdr l)))
 
-;; broken
-($macro $let (defs body)
-   (~ $eval (cons (~ $lambda (map defs $car) body) (~ $mapeval (map defs $cadr)))))
 ($function lettest (c)
-  (progn
-    (log c)
-    ($let ((a 3) (b (+ 2 c))) (* a b))))
+  ($let ((a 3) (b (+ 2 c))) (* a b)))
 
-(log (lettest 5))
+(log "lettest" (lettest 5))
 
 ($macro $when (
     cond ;; whether
@@ -47,15 +40,20 @@
     (eval body)
     false))
 
-($macro $cond ((rest ifthens))
-  ($let
-    ((head (car ifthens))
-     (tail (cdr ifthens)))
-    ($if (eval (car head))
-      (eval (cadr head))
-      ($if (is tail)
-        (apply $cond tail)
-        false))))
+;; ($macro $cond ((rest ifthens))
+;;   ($let
+;;     ((head (car ifthens))
+;;      (tail (cdr ifthens)))
+;;     ($if (eval (car head))
+;;       (eval (cadr head))
+;;       ($if (is tail)
+;;         (apply $cond tail)
+;;         false))))
+;; (log (concat "cond "
+;;   ($cond
+;;     ((gt (fib 5) 150) "bad")
+;;     ((lt (fib 5) 150) "good")
+;;     (true "bad again"))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -84,10 +82,5 @@
     (* fibn factn)))
 (log (fibfact 10))
 
-(log (concat "cond "
-  ($cond
-    ((gt (fib 5) 150) "bad")
-    ((lt (fib 5) 150) "good")
-    (true "bad again"))))
 (log (run "(+ (fact 5) 7)"))
 (log (jsrun "let n = 1; for (let i = 0; i < 10; i++) { n = (n + i) * 2; } return n"))

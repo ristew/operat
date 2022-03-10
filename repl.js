@@ -11,7 +11,7 @@ const rl = readline.createInterface({
 });
 
 
-let replEnv = env.$childenv._();
+let replEnv = env.$childenv._(env);
 replEnv.hygenic = true;
 
 try {
