@@ -40,20 +40,15 @@
     (eval body)
     false))
 
-;; ($macro $cond ((rest ifthens))
-;;   ($let
-;;     ((head (car ifthens))
-;;      (tail (cdr ifthens)))
-;;     ($if (eval (car head))
-;;       (eval (cadr head))
-;;       ($if (is tail)
-;;         (apply $cond tail)
-;;         false))))
-;; (log (concat "cond "
-;;   ($cond
-;;     ((gt (fib 5) 150) "bad")
-;;     ((lt (fib 5) 150) "good")
-;;     (true "bad again"))))
+($macro :trace $cond ((rest ifthens))
+  ($let
+    ((head (car ifthens))
+     (tail (cdr ifthens)))
+    ($if (eval (car head))
+      (eval :debug (cadr head))
+      ($if (is tail)
+        (apply $cond tail)
+        false))))
 
 ($function fact (n)
   ($if (eq n 0)
@@ -74,6 +69,12 @@
 ($logtime (_nativefib 24))
 
 ($logtime (fib 24))
+
+(log (concat "cond "
+  ($cond
+    ((gt (fib 5) 150) "bad")
+    ((lt (fib 5) 150) "good")
+    (true "bad again"))))
 
 ($function fibfact (n)
   ($let

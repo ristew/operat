@@ -134,7 +134,11 @@ export function newenv() {
       } else if (this.$numberp._(o)) {
         return o;
       } else if (this.$stringp._(o)) {
-        return `${o}`;
+        if (o.includes(' ')) {
+          return `"${o}"`;
+        } else {
+          return `${o}`;
+        }
       } else if (this.$listp._(o)) {
         return `(${this.$printlist._(o)})`;
       } else if (this.$functionp._(o)) {
@@ -165,7 +169,7 @@ export function newenv() {
             if (args.length > 0 && args[0] === '$') {
               return args.slice(1);
             } else if (wrap) {
-              return args.map(arg => lambdaEnv.$eval('$', arg));
+              return args.map(arg => lambdaEnv.$eval(arg));
             } else {
               return args;
             }
@@ -255,7 +259,7 @@ export function newenv() {
     },
 
     is(arg) {
-      return !this.nil(arg);
+      return !this.nil._(arg);
     },
 
     nil(arg) {
