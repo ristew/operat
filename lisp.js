@@ -34,6 +34,51 @@ export function isvau(fname) {
 
 export function newenv() {
   let env = {
+    defclass(name, o, ext = []) {
+      function fetchSuper(sup) {
+        if (this.$symbolp(sup) || typeof sup === 'string') {
+          return this[sup];
+        } else {
+          return sup;
+        }
+      }
+      return new Proxy({
+        ext: ext.map(fetchSuper),
+        name,
+        ...o
+      }, {
+        get(target, p, receiver) {
+          if (p in target) {
+            this.vis = false;
+            return target[p];
+          } else {
+            if (this.vis) {
+              this.vis = false;
+              return undefined;
+            }
+            this.vis = true;
+            for (let sup of target.ext) {
+              let fnd = sup[p];
+              if (fnd) {
+                this.vis = false;
+                return fnd;
+              }
+            }
+            return undefined;
+          }
+        },
+
+        set(target, p, value, receiver) {
+          if (!target.static) {
+            target[p] = value;
+            return true;
+          } else {
+            return false;
+          }
+        },
+      })
+    },
+
     cons(a, b) {
       return this.$cons(a, b);
     },
@@ -208,6 +253,18 @@ export function newenv() {
     level: 0,
 
     hygenic: false,
+
+    functionclass() {
+      return this.defclass('function', {
+        constructor(fn) {
+          this.fn = fn;
+        },
+
+        apply(thisArg, args) {
+          return this.fn.apply(thisArg, args);
+        },
+      }, [])
+    },
 
     // lexical scoping is this easy (without closures)
     $childenv(base = this) {
