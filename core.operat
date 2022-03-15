@@ -27,7 +27,7 @@
 ($function cadr (l) (car (cdr l)))
 
 ($function lettest (c)
-  ($let ((a 3) (b (+ 2 c))) (* a b)))
+  ($let ((a 3) (b ($dbg + 2 c))) (* a b)))
 
 (log "lettest" (lettest 5))
 
@@ -40,12 +40,12 @@
     (eval body)
     false))
 
-($macro :trace $cond ((rest ifthens))
+($macro $cond ((rest ifthens))
   ($let
     ((head (car ifthens))
      (tail (cdr ifthens)))
     ($if (eval (car head))
-      (eval :debug (cadr head))
+      ($dbg eval (cadr head))
       ($if (is tail)
         (apply $cond tail)
         false))))

@@ -171,6 +171,12 @@ export function newenv() {
       return isvau(this.$name(fn));
     },
 
+    $dbg(...args) {
+      let res = this.$eval(...args);
+      this.$log(args, res);
+      return res;
+    },
+
     $print(o) {
       if (o instanceof Error) {
         return o.stack;
