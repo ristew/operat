@@ -45,7 +45,7 @@
     ((head (car ifthens))
      (tail (cdr ifthens)))
     ($if (eval (car head))
-      ($dbg eval (cadr head))
+      (eval (cadr head))
       ($if (is tail)
         (apply $cond tail)
         false))))

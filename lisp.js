@@ -345,15 +345,6 @@ export function newenv() {
       return this.$listp(form) && this.$eq(this.$car(form), new OpSymbol(name));
     },
 
-    $progn(...args) {
-      this.$debug('progn', args);
-      let res;
-      for (let statement of args) {
-        res = this.$eval(statement);
-      }
-      return res;
-    },
-
     _nativefib(n) {
       return (n < 2) ? (n) : (this._nativefib(n - 1) + this._nativefib(n - 2));
     },
@@ -579,13 +570,22 @@ return ${target}`;
       return fn.fname || 'anonymous';
     },
 
+    $progn(...args) {
+      let res;
+      for (let statement of args) {
+        res = this.eval(statement);
+      }
+      this.$debug('progn', args, res);
+      return res;
+    },
+
     run(code) {
       return this.$run(code);
     },
 
     $run(code) {
       this.$debug('run', code);
-      this.$parseToplevel(code).forEach(f => this.$eval(f));
+      return this.$progn(...this.$parseToplevel(code));
     },
 
     jsrun(code) {
