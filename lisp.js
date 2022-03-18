@@ -8,16 +8,13 @@
  * trying to make fexprs work a la kernel
  * applicatives are normal, operatives start with $
  */
-import util from 'util';
-import process from 'process';
-
 export class OpSymbol {
   constructor(s) {
     this.name = s;
   }
-  [util.inspect.custom](depth, opts) {
-    return '`' + this.name + '`';
-  }
+  // [util.inspect.custom](depth, opts) {
+  //   return '`' + this.name + '`';
+  // }
 
   toString() {
     return this.name;
@@ -34,17 +31,17 @@ export function isvau(fname) {
 
 export function newenv() {
   let env = {
-    defclass(name, o, ext = []) {
-      function fetchSuper(sup) {
-        if (this.$symbolp(sup) || typeof sup === 'string') {
-          return this[sup];
-        } else {
-          return sup;
-        }
-      }
+    /*
+     * (defclass { (name "adder") operator })
+     */
+    defclass(o, exts = []) {
       return new Proxy({
-        ext: ext.map(fetchSuper),
-        name,
+        exts,
+        _set(name, value) {
+          this.doset = true;
+          this[name] = value;
+          this.doset = false;
+        },
         ...o
       }, {
         get(target, p, receiver) {
@@ -68,8 +65,8 @@ export function newenv() {
           }
         },
 
-        set(target, p, value, receiver) {
-          if (!target.static) {
+        set(target, p, value) {
+          if (p === 'doset' || target[doset]) {
             target[p] = value;
             return true;
           } else {
@@ -660,10 +657,6 @@ return ${target}`;
       return c.apply(this, ops);
     },
 
-    exit() {
-      process.exit(0);
-    },
-
     $parseToplevel(s) {
       let toks = this.$tokenize(s);
       let p = [];
@@ -786,7 +779,7 @@ return ${target}`;
       if (this.recover) {
         fn();
       } else {
-        process.exit(0);
+        throw new Error('die: ' + e);
       }
     }
   };
