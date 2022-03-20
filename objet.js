@@ -1,7 +1,30 @@
 
 function classDef(supers, slots) {
   let proto = {
+    wrapFn(fn) {
+      return new Proxy(fn, {
+        apply(target, thisArg, args) {
+          let res = target.apply(thisArg, args);
+          if (target.def.after) {
+            res = target.def.after(res);
+          }
+          return res;
+        }
+      })
+    },
     addSlot(slotDef) {
+      if (typeof slotDef === 'function') {
+        slotDef = { name: slotDef.name, type: 'method', default: slotDef };
+      }
+      if ('after' in slotDef) {
+        let target = this[slotDef.after];
+        target.after = slotDef.fn;
+        return;
+      }
+      if (slotDef.type === 'method') {
+        slotDef.default = this.wrapFn(slotDef.default);
+        slotDef.default.def = slotDef;
+      }
       let name = slotDef.name;
       // check if a slot is being shadowed
       let cur = this[name];
@@ -20,7 +43,7 @@ function classDef(supers, slots) {
       }
     },
 
-    instantiate(passedVals) {
+    instantiate(passedVals = []) {
       let o = { meta: this };
       for (let slot of this.slots) {
         let def = this[slot];
@@ -33,11 +56,12 @@ function classDef(supers, slots) {
         } else {
           throw new Error('Missing value in instantiation: ' + slot);
         }
-        if (def.type === 'method') {
-          o[slot] = o[slot].bind(o);
-        }
       }
-      return o;
+      return new Proxy(o, {
+        get(target, p) {
+          return target[p];
+        },
+      });
     },
     slots: [],
     type: 'class',
@@ -58,15 +82,20 @@ function classDef(supers, slots) {
  * (map name a default 2)
  */
 
-let A = classDef([], [{ name: 'a', type: 'number', default: 2 }]);
-console.log(A);
-let B = classDef([A], [
-  { name: 'b', type: 'number', default: 3 },
-  { name: 'test', type: 'method', default() { return this.a + this.b; } },
+const Animal = classDef([], [
+  { name: 'name', type: 'string' },
+  function hello() {
+    return `${this.name} says hello`;
+  },
 ]);
-console.log(B);
-let C = classDef([A, B], [{ name: 'a', default: 4 }]);
-console.log(C);
-
-let c = C.instantiate({ b: 6 });
-console.log(c.test());
+const Dog = classDef([Animal], [
+  { name: 'name', default: 'Dog' },
+]);
+const Cat = classDef([Animal], [
+  { name: 'name', default: 'Cat' },
+  { after: 'hello', fn(res) { return res + ' meowingly' } }
+]);
+let dog = Dog.instantiate();
+let cat = Cat.instantiate();
+console.log(dog.hello());
+console.log(cat.hello());
