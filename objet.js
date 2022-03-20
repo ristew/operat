@@ -4,10 +4,8 @@ function classDef(supers, slots) {
     wrapFn(fn) {
       return new Proxy(fn, {
         apply(target, thisArg, args) {
+          // console.log(target.def.name);
           let res = target.apply(thisArg, args);
-          if (target.def.after) {
-            res = target.def.after(res);
-          }
           return res;
         }
       })
@@ -16,20 +14,11 @@ function classDef(supers, slots) {
       if (typeof slotDef === 'function') {
         slotDef = { name: slotDef.name, type: 'method', default: slotDef };
       }
-      if ('after' in slotDef) {
-        let target = this[slotDef.after];
-        target.after = slotDef.fn;
-        return;
-      }
-      if (slotDef.type === 'method') {
-        slotDef.default = this.wrapFn(slotDef.default);
-        slotDef.default.def = slotDef;
-      }
       let name = slotDef.name;
       // check if a slot is being shadowed
       let cur = this[name];
       if (cur) {
-        console.log('shadowed ', name);
+        // console.log('shadowed', name);
         slotDef = { ...cur, ...slotDef };
       } else {
         this.slots.push(name);
@@ -43,7 +32,7 @@ function classDef(supers, slots) {
       }
     },
 
-    instantiate(passedVals = []) {
+    instantiate(passedVals = {}) {
       let o = { meta: this };
       for (let slot of this.slots) {
         let def = this[slot];
@@ -51,6 +40,9 @@ function classDef(supers, slots) {
           o[slot] = passedVals[slot];
         } else if (def.default) {
           o[slot] = def.default;
+        } else if (def.method) {
+          o[slot] = this.wrapFn(def.method);
+          o[slot].def = def;
         } else if (def.optional) {
           o[slot] = null;
         } else {
@@ -76,26 +68,30 @@ function classDef(supers, slots) {
   return proto;
 }
 
-/*
- * { name: a, default: 2 }
- * { name a default 2 }
- * (map name a default 2)
- */
+// toy example
 
-const Animal = classDef([], [
-  { name: 'name', type: 'string' },
-  function hello() {
-    return `${this.name} says hello`;
-  },
+const Shape = classDef([], [
+  { name: 'area', type: 'method' },
 ]);
-const Dog = classDef([Animal], [
-  { name: 'name', default: 'Dog' },
+
+/*
+ * (class Circle (Shape)
+ *   (r type number default 1)
+ *   (area method () (* Math.PI (pow r 2))))
+ */
+const Circle = classDef([Shape], [
+  { name: 'r', type: 'number', default: 1 },
+  { name: 'area', method() { return Math.PI * this.r**2; } },
 ]);
-const Cat = classDef([Animal], [
-  { name: 'name', default: 'Cat' },
-  { after: 'hello', fn(res) { return res + ' meowingly' } }
+
+const Rect = classDef([Shape], [
+  { name: 'h', type: 'number', default: 1 },
+  { name: 'l', type: 'number', default: 1 },
+  { name: 'area', method() { return this.h * this.l; } },
 ]);
-let dog = Dog.instantiate();
-let cat = Cat.instantiate();
-console.log(dog.hello());
-console.log(cat.hello());
+
+let circ = Circle.instantiate();
+let rect = Rect.instantiate({ l: 3 });
+
+console.log(circ.area());
+console.log(rect.area());
