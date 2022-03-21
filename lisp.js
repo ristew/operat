@@ -8,6 +8,7 @@
  * trying to make fexprs work a la kernel
  * applicatives are normal, operatives start with $
  */
+import { classDef } from './object'
 export class OpSymbol {
   constructor(s) {
     this.name = s;
@@ -32,51 +33,6 @@ export function isvau(fname) {
 
 export function newenv() {
   let env = {
-    /*
-     * (defclass { (name "adder") operator })
-     */
-    defclass(o, exts = []) {
-      return new Proxy({
-        exts,
-        _set(name, value) {
-          this.doset = true;
-          this[name] = value;
-          this.doset = false;
-        },
-        ...o
-      }, {
-        get(target, p, receiver) {
-          if (p in target) {
-            this.vis = false;
-            return target[p];
-          } else {
-            if (this.vis) {
-              this.vis = false;
-              return undefined;
-            }
-            this.vis = true;
-            for (let sup of target.ext) {
-              let fnd = sup[p];
-              if (fnd) {
-                this.vis = false;
-                return fnd;
-              }
-            }
-            return undefined;
-          }
-        },
-
-        set(target, p, value) {
-          if (p === 'doset' || target[doset]) {
-            target[p] = value;
-            return true;
-          } else {
-            return false;
-          }
-        },
-      })
-    },
-
     cons(a, b) {
       return this.$cons(a, b);
     },

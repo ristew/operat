@@ -1,5 +1,5 @@
 
-function classDef(supers, slots) {
+export function classDef(supers, slots) {
   let proto = {
     wrapFn(fn) {
       return new Proxy(fn, {
@@ -69,29 +69,30 @@ function classDef(supers, slots) {
 }
 
 // toy example
+function testObject() {
+  const Shape = classDef([], [
+    { name: 'area', type: 'method' },
+  ]);
 
-const Shape = classDef([], [
-  { name: 'area', type: 'method' },
-]);
+  /*
+   * (class Circle (Shape)
+   *   (r type number default 1)
+   *   (area method () (* Math.PI (pow r 2))))
+   */
+  const Circle = classDef([Shape], [
+    { name: 'r', type: 'number', default: 1 },
+    { name: 'area', method() { return Math.PI * this.r**2; } },
+  ]);
 
-/*
- * (class Circle (Shape)
- *   (r type number default 1)
- *   (area method () (* Math.PI (pow r 2))))
- */
-const Circle = classDef([Shape], [
-  { name: 'r', type: 'number', default: 1 },
-  { name: 'area', method() { return Math.PI * this.r**2; } },
-]);
+  const Rect = classDef([Shape], [
+    { name: 'h', type: 'number', default: 1 },
+    { name: 'l', type: 'number', default: 1 },
+    { name: 'area', method() { return this.h * this.l; } },
+  ]);
 
-const Rect = classDef([Shape], [
-  { name: 'h', type: 'number', default: 1 },
-  { name: 'l', type: 'number', default: 1 },
-  { name: 'area', method() { return this.h * this.l; } },
-]);
+  let circ = Circle.instantiate();
+  let rect = Rect.instantiate({ l: 3 });
 
-let circ = Circle.instantiate();
-let rect = Rect.instantiate({ l: 3 });
-
-console.log(circ.area());
-console.log(rect.area());
+  console.log(circ.area());
+  console.log(rect.area());
+}
