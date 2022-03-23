@@ -8,7 +8,10 @@
  * trying to make fexprs work a la kernel
  * applicatives are normal, operatives start with $
  */
-import { classDef } from './object'
+import { classDef } from './objet.js'
+
+const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+
 export class OpSymbol {
   constructor(s) {
     this.name = s;
@@ -488,7 +491,7 @@ export function newenv() {
       }
       return [];
     },
-    $transvau(args, body) {
+    $transvau(args, body, asink = false) {
       // this.$log('transvau', args, body);
       let target = this.$compile._(body);
       function transvaudebug(ag) {
@@ -504,13 +507,17 @@ return ${target}`;
       const vauArgs = this.$compileargs._(args);
       vauArgs.push(vauCode);
       this.$debug('transvau', body, vauArgs);
-      return new Function(...vauArgs);
+      if (asink) {
+        return new AsyncFunction(...vauArgs);
+      } else {
+        return new Function(...vauArgs);
+      }
     },
 
     $vau(args, body, name = null, hygenic = true) {
       let [doc] = this.$pullarg._('doc', args);
       this.$debug('vau', name, args, body);
-      let target = this.$transvau._(args, body, hygenic);
+      let target = this.$transvau._(args, body);
       let resfn = this._fn(target, name, false, hygenic);
       resfn.args = args;
       resfn.body = body;
