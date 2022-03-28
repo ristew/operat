@@ -85,4 +85,35 @@
 
 (log (run "(+ (fact 5) 7)"))
 (log (jsrun "let n = 1; for (let i = 0; i < 10; i++) { n = (n + i) * 2; } return n"))
-(jsrun "process.exit(0)")
+
+($defclass point ()
+  (parameter x (type number) (default 0))
+  (parameter y (type number) (default 0))
+  (method translate
+    (args (
+      (arg dx (type number) (default 0))
+      (arg dy (type number) (default 0))
+    ))
+    (returns self)
+    (fn (
+      ($SET X (+ X DX))
+      ($SET Y (+ Y DY))
+    ))
+  )
+)
+
+($defclass shape ()
+  (function area
+    (args ())
+    (returns number)
+    virtual
+  )
+)
+
+($defclass circle (shape point)
+  (parameter r (type number) (default 1))
+  (function area (fn (* PI (pow r 2))))
+  )
+
+($let ((c ($make circle (r 5))))
+  (log ($send c area)))

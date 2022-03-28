@@ -36,6 +36,16 @@ export function isvau(fname) {
 
 export function newenv() {
   let env = {
+    $class(supers, slotDefs) {
+      return classDef(this.$mapeval(supers), slotDefs);
+    },
+    $defclass(name, supers, ...slotDefs) {
+      this.$define(name, this.$class(supers, slotDefs));
+    },
+    $make(className, ...inits) {
+      let klass = this.$eval(className);
+      return klass.instantiate(...inits);
+    },
     cons(a, b) {
       return this.$cons(a, b);
     },
@@ -153,7 +163,7 @@ export function newenv() {
         let name = this.$name._(o);
         return `(${this.$vaup._(o) ? '$vau' : '$lambda'} ${name})`;
       } else if (this.$objp._(o)) {
-        return `\n(obj ${this.$printlist._(Object.entries(o).map(([key, val]) => [new OpSymbol(key), val]))})\n`
+        return `\n(obj ${this.$printlist._(Object.entries(o))})\n`
       } else if (this.$booleanp._(o)) {
         return o;
       }
@@ -345,7 +355,7 @@ export function newenv() {
 
     $repr(form, bracket = true) {
       if (this.$symbolp(form)) {
-        return `this.$symbol(${this.$repr(form.name)})`;
+        return form;
       } else if (this.$listp(form)) {
         const [ob, eb] = bracket ? ['[', ']'] : ['', ''];
         return `${ob}${form.map(e => this.$repr(e)).join(', ')}${eb}`

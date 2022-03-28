@@ -11,9 +11,7 @@ export function classDef(supers, slots) {
       })
     },
     addSlot(slotDef) {
-      if (typeof slotDef === 'function') {
-        slotDef = { name: slotDef.name, type: 'method', default: slotDef };
-      }
+      console.log('addSlot', slotDef);
       let name = slotDef.name;
       // check if a slot is being shadowed
       let cur = this[name];
@@ -27,6 +25,8 @@ export function classDef(supers, slots) {
     },
 
     mergeSuper(sup) {
+      // console.log(this, sup);
+
       for (let slot of sup.slots) {
         this.addSlot(sup[slot]);
       }
@@ -117,5 +117,3 @@ function testObject() {
   circ.translate(4, 2);
   console.log(circ.x, circ.y);
 }
-
-testObject();
