@@ -38,10 +38,10 @@ export function classDef(supers, slots) {
         let def = this[slot];
         if (passedVals[slot]) {
           o[slot] = passedVals[slot];
-        } else if (def.default) {
+        } else if (def.hasOwnProperty('default')) {
           o[slot] = def.default;
-        } else if (def.method) {
-          o[slot] = this.wrapFn(def.method);
+        } else if (['method', 'function'].includes(def.type)) {
+          o[slot] = this.wrapFn(def[def.name]);
           o[slot].def = def;
         } else if (def.optional) {
           o[slot] = null;
@@ -71,23 +71,41 @@ export function classDef(supers, slots) {
 // toy example
 function testObject() {
   const Shape = classDef([], [
-    { name: 'area', type: 'method' },
+    { name: 'area', type: 'function', args: [], returns: 'number', virtual: true },
   ]);
 
   /*
-   * (class Circle (Shape)
+   * (class Circle (Shape Point)
    *   (r type number default 1)
    *   (area method () (* Math.PI (pow r 2))))
    */
-  const Circle = classDef([Shape], [
-    { name: 'r', type: 'number', default: 1 },
-    { name: 'area', method() { return Math.PI * this.r**2; } },
+  const Point = classDef([], [
+    { name: 'x', type: 'number', default: 0 },
+    { name: 'y', type: 'number', default: 0 },
+    {
+      name: 'translate',
+      type: 'method',
+      args: [
+        { name: 'dx', type: 'number', default: 0 },
+        { name: 'dy', type: 'number', default: 0 },
+      ],
+      returns: 'self',
+      translate(dx, dy) {
+        this.x += dx;
+        this.y += dy;
+      }
+    }
   ]);
 
-  const Rect = classDef([Shape], [
+  const Circle = classDef([Shape, Point], [
+    { name: 'r', type: 'number', default: 1 },
+    { name: 'area', type: 'function', args: [], returns: 'number', area() { return Math.PI * this.r**2; } },
+  ]);
+
+  const Rect = classDef([Shape, Point], [
     { name: 'h', type: 'number', default: 1 },
     { name: 'l', type: 'number', default: 1 },
-    { name: 'area', method() { return this.h * this.l; } },
+    { name: 'area', type: 'function', args: [], returns: 'number', area() { return this.h * this.l; } },
   ]);
 
   let circ = Circle.instantiate();
@@ -95,4 +113,9 @@ function testObject() {
 
   console.log(circ.area());
   console.log(rect.area());
+  circ.translate(2, 3);
+  circ.translate(4, 2);
+  console.log(circ.x, circ.y);
 }
+
+testObject();
