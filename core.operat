@@ -102,6 +102,22 @@
   )
 )
 
+($defclass point () {
+  x: (parameter {
+    type: number
+    default: 0
+  })
+  y: (parameter {
+    type: number
+    default: 0
+  })
+  translate: (method {
+    args: ({ name: dx type: number default 0 } { name: dy type: number default 0 })
+    returns: self
+    fn: (($>> x (+ x dx)) ($>> y (+ y dy)))
+  })
+})
+
 ($defclass shape ()
   (function area
     (args ())
@@ -116,4 +132,4 @@
   )
 
 ($let ((c ($make circle (r 5))))
-  (log ($send c area)))
+  (log (c area)))
