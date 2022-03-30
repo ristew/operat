@@ -103,20 +103,31 @@
 )
 
 ($defclass point () {
-  x: (parameter {
-    type: number
-    default: 0
+  x (parameter {
+    type number
+    default 0
   })
-  y: (parameter {
-    type: number
-    default: 0
+  y (parameter {
+    type number
+    default 0
   })
-  translate: (method {
-    args: ({ name: dx type: number default 0 } { name: dy type: number default 0 })
-    returns: self
-    fn: (($>> x (+ x dx)) ($>> y (+ y dy)))
-  })
+  translate (method {
+      args ({ name dx type number default 0 } { name dy type number default 0 })
+      returns self
+      fn (
+        (set x (+ x dx))
+        (set y (+ y dy))
+      )
+    }
+    (set x (+ x dx))
+    (set y (+ y dy)))
 })
+
+
+((. p x) 2 3)
+(p.x 2 3)
+((. p x y) 2 3)
+(p.x.y 2 3)
 
 ($defclass shape ()
   (function area

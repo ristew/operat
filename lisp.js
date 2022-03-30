@@ -12,21 +12,17 @@ import { classDef } from './objet.js'
 
 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
 
-export class OpSymbol {
+export class OpStr {
   constructor(s) {
-    this.name = s;
+    this.str = s;
   }
   // [util.inspect.custom](depth, opts) {
   //   return '`' + this.name + '`';
   // }
 
   toString() {
-    return this.name;
+    return this.str;
   }
-}
-
-export function q(s) {
-  return new OpSymbol(s);
 }
 
 export function isvau(fname) {
@@ -148,14 +144,14 @@ export function newenv() {
       if (o instanceof Error) {
         return o.stack;
       } else if (this.$symbolp._(o)) {
-        return o.name;
+        return o;
       } else if (this.$numberp._(o)) {
         return o;
       } else if (this.$stringp._(o)) {
-        if (o.includes(' ')) {
-          return `"${o}"`;
+        if (o.str.includes(' ')) {
+          return `"${o.str}"`;
         } else {
-          return `${o}`;
+          return `${o.str}`;
         }
       } else if (this.$listp._(o)) {
         return `(${this.$printlist._(o)})`;
@@ -174,7 +170,7 @@ export function newenv() {
     },
 
     $stringp(s) {
-      return typeof s === 'string';
+      return s instanceof OpStr;
     },
 
     _fn(fn, name, wrap = false, hygenic = true) {
@@ -279,8 +275,8 @@ export function newenv() {
     },
 
     $eq(a, b) {
-      if (this.$symbolp(a) && this.$symbolp(b)) {
-        return a.name === b.name;
+      if (this.$stringp(a) && this.$stringp(b)) {
+        return a.str === b.str;
       } else if (this.$listp(a) && this.$listp(b)) {
         return a.length === 0 && b.length === 0;
       } else {
@@ -322,7 +318,7 @@ export function newenv() {
         this.parent.$set._(symbol, value);
       } else {
         this.$debug('set', symbol, value, this.hygenic, this.level);
-        this[symbol.name] = value;
+        this[symbol] = value;
       }
       return value;
     },
@@ -360,7 +356,7 @@ export function newenv() {
         const [ob, eb] = bracket ? ['[', ']'] : ['', ''];
         return `${ob}${form.map(e => this.$repr(e)).join(', ')}${eb}`
       } else if (this.$stringp(form)) {
-        return `'${form.replace(/'/g, "\\'")}'`;
+        return `'${form.str.replace(/'/g, "\\'")}'`;
       } else {
         return form.toString();
       }
@@ -390,11 +386,11 @@ export function newenv() {
       this.$debug('compile', form);
       if (this.$listp(form) && form.length > 0) {
         let op = this.$car(form);
-        let comp = this[op]?.comp || this.nativecomps[op.name + 'comp'];
+        let comp = this[op]?.comp || this.nativecomps[op + 'comp'];
         if (comp) {
           return comp.apply(this, this.$cdr(form));
-        } else if (op.name) {
-          if (!isvau(op.name)) {
+        } else if (op) {
+          if (!isvau(op)) {
             // this.$log('compile', 'wrap', op);
             if (trace) {
               return `${this.$compref(op)}('$', ${this.$mapcompile(this.$cdr(form))})`
@@ -474,7 +470,7 @@ export function newenv() {
 
     $compileargs(args) {
       return args.map(arg => this.$caris(arg, 'rest') ?
-        '...' + this.$car(this.$cdr(arg)).name : arg.name);
+        '...' + this.$car(this.$cdr(arg)) : arg);
     },
 
     $argname(arg) {
@@ -612,15 +608,12 @@ return ${target}`;
         // this.$debug('eval', operator, ...args, '=', res)
         return res;
       } else if (this.$symbolp._(form)) {
-        if (form.name[0] === "'") {
-          return new OpSymbol(form.name.slice(1));
-        }
-        let sym = this[form.name];
+        let sym = this[form];
         if (typeof sym === 'undefined') {
           throw new Error(`undefined ${form}`);
         }
         // this.$debug('symbol', form, this[form.name]);
-        return this[form.name];
+        return this[form];
       } else {
         return form;
       }
@@ -685,7 +678,7 @@ return ${target}`;
     $numberp: s => typeof s === 'number',
 
     $symbolp(s) {
-      return s instanceof OpSymbol;
+      return typeof s === 'string';
     },
 
     $listp(s) {
@@ -708,7 +701,7 @@ return ${target}`;
       let toks = [];
       for (let i = 0; i < s.length; i++) {
         let c = s[i];
-        if ('()'.includes(c)) {
+        if ('(){}:'.includes(c)) {
           toks.push(c);
         } else if (c === ';') {
           while (s[i] !== '\n') {
@@ -722,10 +715,10 @@ return ${target}`;
             str += s[i];
             i++;
           }
-          toks.push(str);
+          toks.push(new OpStr(str));
         } else {
           let sym = '';
-          while (s[i] && /[^ \n\t();"]/.test(s[i])) {
+          while (s[i] && /[^ \n\t(){}:;"]/.test(s[i])) {
             sym += s[i];
             i++;
           }
@@ -736,7 +729,7 @@ return ${target}`;
           } else if (sym === 'true' || sym === 'false') {
             toks.push(JSON.parse(sym))
           } else {
-            toks.push(new OpSymbol(sym));
+            toks.push(sym);
           }
         }
       }
