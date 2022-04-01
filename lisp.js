@@ -29,21 +29,17 @@ export function isvau(fname) {
 
 export function newenv() {
   let env = {
-    $class(supers, slotDefs) {
-      return classDef(this.$mapeval(supers), slotDefs);
+    class($supers, $slotDefs) {
+      return classDef(this.mapeval(supers), slotDefs);
     },
-    $defclass(name, supers, ...slotDefs) {
-      this.$define(name, this.$class(supers, slotDefs));
+    defclass($name, $supers, ...$slotDefs) {
+      this.define(name, this.class(supers, slotDefs));
     },
-    $make(className, ...inits) {
-      let klass = this.$eval(className);
-      return klass.instantiate(...inits);
-    },
-    cons(a, b) {
-      return this.$cons(a, b);
+    make(class, ...$inits) {
+      return class.instantiate(...$inits);
     },
 
-    $cons(a, b) {
+    cons(a, b) {
       if (Array.isArray(b)) {
         return [a, ...b];
       } else {
@@ -61,10 +57,6 @@ export function newenv() {
       return l[0];
     },
 
-    $car(l) {
-      return l[0];
-    },
-
     cdr(l) {
       return l.slice(1);
     },
@@ -73,17 +65,13 @@ export function newenv() {
       return l.slice(1);
     },
 
-    $log(...args) {
-      let printed = args.map(a => this.$print(a));
+    log(...args) {
+      let printed = args.map(a => this.print($(a)));
       console.log(...printed);
     },
 
-    log(...args) {
-      this.$log(...args);
-    },
-
     shoulddebug: {},
-    debug(item) {
+    dodebug($item) {
       this.shoulddebug[item] = true;
     },
 
@@ -91,40 +79,18 @@ export function newenv() {
       this.shoulddebug = {};
     },
 
-    $debug(subject, ...args) {
+    debug(subject, ...args) {
       if (this.shoulddebug[subject]) {
-        this.$log.apply(this, [subject, ...args]);
+        this.log.apply(this, [subject, ...args]);
       }
     },
 
-    $obj(...bindings) {
-      let m = {};
-      for (let binding of bindings) {
-        let name = binding[0];
-        let value = binding[1];
-        m[name] = this.$eval(value);
-      }
-      return m;
+    typeof(o) {
+      return typeof o;
     },
 
-    $get(map, key) {
-      return map[key];
-    },
-
-    get(map, key) {
-      return map[key];
-    },
-
-    $mset(map, key, val) {
-      return this.$eval(map)[key] = val;
-    },
-
-    $objp(m) {
-      return m && typeof m === 'object';
-    },
-
-    $printlist(os) {
-      return os.map(e => this.$print(e)).join(' ');
+    printlist(os) {
+      return os.map(e => this.print($(e))).join(' ');
     },
 
     $vaup(fn) {
@@ -303,10 +269,10 @@ export function newenv() {
       return (n < 2) ? (n) : (this._nativefib(n - 1) + this._nativefib(n - 2));
     },
 
-    $set(symbol, value) {
+    set($symbol, value) {
       if (this.parent && !this.hygenic) {
         this.$debug('set', 'up', symbol, '=', value, this.hygenic, this.level);
-        this.parent.$set._(symbol, value);
+        this.parent.set._(symbol, value);
       } else {
         this.$debug('set', symbol, value, this.hygenic, this.level);
         this[symbol] = value;
@@ -314,13 +280,13 @@ export function newenv() {
       return value;
     },
 
-    $define(symbol, value) {
+    define(symbol, value) {
       let val = this.$eval(value);
       // this.$log('define', symbol, val);
       if (typeof val === 'undefined') {
         throw new Error(`attempt to define ${symbol} to undefined!`);
       }
-      return this.$set(symbol, val);
+      return this.set(symbol, val);
     },
 
     $if(cond, then, elsse) {
