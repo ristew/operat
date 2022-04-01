@@ -26,15 +26,15 @@
 
 ($function cadr (l) (car (cdr l)))
 
-($function lettest (c)
-  ($let ((a 3) (b ($dbg + 2 c))) (* a b)))
+;; ($function lettest (c)
+;;   ($let ((a 3) (b ($dbg + 2 c))) (* a b)))
 
-(log "lettest" (lettest 5))
+;; (log "lettest" (lettest 5))
 
 ($macro $when (
     cond ;; whether
     body ;; to do
-    (doc "when this, do that")
+    (doc "when this do that")
   )
   ($if (eval cond)
     (eval body)

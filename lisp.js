@@ -170,20 +170,17 @@ export function newenv() {
       return s instanceof OpStr;
     },
 
-    _fn(fn, name, wrap = false, hygenic = true) {
+    _fn(fn, name, args = [], hygenic = true) {
       // this.$log('fn', fn, name, wrap, hygenic);
       let pfn = new Proxy(fn, {
         apply(target, thisArg, args) {
           let lambdaEnv = thisArg.$childenv._(thisArg);
           lambdaEnv.hygenic = hygenic;
           function wrapArgs() {
-            if (args.length > 0 && args[0] === '$') {
-              return args.slice(1);
-            } else if (wrap) {
-              return args.map(arg => lambdaEnv.$eval(arg));
-            } else {
-              return args;
-            }
+            return args.map((arg, i) => {
+              let argDef = target.args[i];
+              return argDef.vau ? arg : lambdaEnv.$eval(arg);
+            });
           }
           let wargs = wrapArgs(args);
           lambdaEnv.$pushstack._([name, ...wargs]);
@@ -193,6 +190,7 @@ export function newenv() {
         },
       });
       pfn.fname = name?.toString();
+      pfn.args = args;
       pfn._ = fn.bind(this);
       return pfn;
     },
@@ -207,12 +205,12 @@ export function newenv() {
       return childenv.$eval(body);
     },
 
-    wrap(fn, name) {
+    wrap(fn, name, args) {
       if (typeof fn !== 'function') {
         throw new Error(`attempted to wrap a non-fn ${fn}`);
       }
-      this.$debug('wrap', fn, name);
-      let resfn = this._fn(fn, name, true, fn.hygenic);
+      this.$debug('wrap', fn, name, args);
+      let resfn = this._fn(fn, name, args, fn.hygenic);
       return resfn;
     },
 
@@ -297,12 +295,8 @@ export function newenv() {
       return this.$symbol(args.join(''));
     },
 
-    $symbol(s) {
-      return new OpSymbol(s);
-    },
-
     $caris(form, name) {
-      return this.$listp(form) && this.$eq(this.$car(form), new OpSymbol(name));
+      return this.$listp(form) && this.$eq(this.$car(form), name);
     },
 
     _nativefib(n) {
@@ -501,6 +495,7 @@ export function newenv() {
         if (false) {
           return `console.log('set ${ag} = ', this['${ag}'])\n`;
         }
+        return '';
       }
       const vauCode = `${args.map(arg => {
         let argname = this.$argname._(arg);
@@ -509,7 +504,7 @@ export function newenv() {
 return ${target}`;
       const vauArgs = this.$compileargs._(args);
       vauArgs.push(vauCode);
-      this.$debug('transvau', body, vauArgs);
+      this.$log('transvau', body, vauArgs);
       if (asink) {
         return new AsyncFunction(...vauArgs);
       } else {
@@ -566,13 +561,17 @@ return ${target}`;
       return this.$eval(...form);
     },
 
+    fnargs($fn) {
+      return [...new Array($fn.length)].map(_ => 'any');
+    },
+
     $boot() {
       for (let fname in this) {
         const fn = this[fname];
         if (typeof fn === 'function' && fname[0] !== '_') {
-          console.log('boot', fname);
-          let wrap = !isvau(fname);
-          this[fname] = this._fn(fn, fname, wrap, false);
+          console.log('boot', fname, fn.length);
+          const args = this.fnargs(fn);
+          this[fname] = this._fn(fn, fname, args, false);
           if (this.nativecomps[fname]) {
             this[fname].comp = this.nativecomps[fname];
           }
@@ -644,13 +643,29 @@ return ${target}`;
         return sexp;
       } else if (token === ')') {
         throw new Error('unexpected )');
+      } else if (token === '{') {
+        let map = {};
+        while (toks[0] !== '}') {
+          const name = this.$readTokens(toks);
+          const val = this.$readTokens(toks);
+          // const sep = this.$readTokens(toks);
+          // if (sep !== ':') {
+          //   // raise hell
+          //   throw new Error('invalid map sep ' + sep);
+          // }
+          map[name] = val;
+        }
+        toks.shift();
+        return map;
+      } else if (token === '}') {
+        throw new Error('unexpected }');
       } else {
         return token;
       }
     },
 
     $call(name, ...args) {
-      return this.$eval._([new OpSymbol(name), ...args]);
+      return this.$eval._([name, ...args]);
     },
 
     map(l, fn) {
@@ -694,6 +709,10 @@ return ${target}`;
       return typeof f === 'function';
     },
 
+    str($s) {
+      return s;
+    },
+
     $tokenize(s) {
       let toks = [];
       for (let i = 0; i < s.length; i++) {
@@ -712,7 +731,8 @@ return ${target}`;
             str += s[i];
             i++;
           }
-          toks.push(new OpStr(str));
+          console.log('str', str);
+          toks.push(['$str', str]);
         } else {
           let sym = '';
           while (s[i] && /[^ \n\t(){}:;"]/.test(s[i])) {

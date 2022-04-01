@@ -10,80 +10,83 @@
 import { readFileSync } from 'fs';
 import { classDef } from './objet.js';
 
-function tokenize(s) {
-  let toks = [];
-  for (let i = 0; i < s.length; i++) {
-    let c = s[i];
-    if ('(){}:'.includes(c)) {
-      toks.push(c);
-    } else if (c === ';') {
-      while (s[i] !== '\n') {
+const base = {
+  tokenize(s) {
+    let toks = [];
+    for (let i = 0; i < s.length; i++) {
+      let c = s[i];
+      if ('(){}:'.includes(c)) {
+        toks.push(c);
+      } else if (c === ';') {
+        while (s[i] !== '\n') {
+          i++;
+        }
+      } else if (' \n\t'.includes(c)) {
+      } else if (c === '"') {
+        let str = '';
         i++;
-      }
-    } else if (' \n\t'.includes(c)) {
-    } else if (c === '"') {
-      let str = '';
-      i++;
-      while (s[i] !== '"') {
-        str += s[i];
-        i++;
-      }
-      toks.push(new OpStr(str));
-    } else {
-      let sym = '';
-      while (s[i] && /[^ \n\t(){}:;"]/.test(s[i])) {
-        sym += s[i];
-        i++;
-      }
-      i--;
-      let float = Number.parseFloat(sym);
-      if (!isNaN(float)) {
-        toks.push(float);
-      } else if (sym === 'true' || sym === 'false') {
-        toks.push(JSON.parse(sym))
+        while (s[i] !== '"') {
+          str += s[i];
+          i++;
+        }
+        toks.push(new OpStr(str));
       } else {
-        toks.push(sym);
+        let sym = '';
+        while (s[i] && /[^ \n\t(){}:;"]/.test(s[i])) {
+          sym += s[i];
+          i++;
+        }
+        i--;
+        let float = Number.parseFloat(sym);
+        if (!isNaN(float)) {
+          toks.push(float);
+        } else if (sym === 'true' || sym === 'false') {
+          toks.push(JSON.parse(sym))
+        } else {
+          toks.push(sym);
+        }
       }
     }
+    return toks;
+  },
+
+  readTokens(toks) {
+    if (toks.length == 0) {
+      throw new Error('unexpected EOF');
+    }
+    let token = toks.shift();
+    if (token === '(') {
+      let sexp = [];
+      while (toks[0] !== ')') {
+        sexp.push(readTokens(toks));
+      }
+      toks.shift();
+      return sexp;
+    } else if (token === ')') {
+      throw new Error('unexpected )');
+    } else if (token === '{') {
+      let map = {};
+      while (toks[0] !== '}') {
+        const name = readTokens(toks);
+        const sep = readTokens(toks);
+        const val = readTokens(toks);
+        if (sep !== ':') {
+          // raise hell
+          throw new Error('invalid map sep ' + sep);
+        }
+        map[name] = val;
+      }
+      toks.shift();
+      return map;
+    } else if (token === '}') {
+      throw new Error('unexpected }');
+    } else {
+      return token;
+    }
   }
-  return toks;
-}
+};
 
 let prog = readFileSync('./mapcore.operat').toString();
-function readTokens(toks) {
-  if (toks.length == 0) {
-    throw new Error('unexpected EOF');
-  }
-  let token = toks.shift();
-  if (token === '(') {
-    let sexp = [];
-    while (toks[0] !== ')') {
-      sexp.push(readTokens(toks));
-    }
-    toks.shift();
-    return sexp;
-  } else if (token === ')') {
-    throw new Error('unexpected )');
-  } else if (token === '{') {
-    let map = {};
-    while (toks[0] !== '}') {
-      const name = readTokens(toks);
-      const sep = readTokens(toks);
-      const val = readTokens(toks);
-      if (sep !== ':') {
-        // raise hell
-        throw new Error('invalid map sep ' + sep);
-      }
-      map[name] = val;
-    }
-    toks.shift();
-    return map;
-  } else if (token === '}') {
-    throw new Error('unexpected }');
-  } else {
-    return token;
-  }
-}
 
 console.log(prog);
 console.log(readTokens(tokenize(prog)));
