@@ -178,8 +178,8 @@ export function newenv() {
           lambdaEnv.hygenic = hygenic;
           function wrapArgs() {
             return args.map((arg, i) => {
-              let argDef = target.args[i];
-              return argDef.vau ? arg : lambdaEnv.$eval(arg);
+              let argDef = args[i];
+              return argDef.vau ? arg : lambdaEnv.$eval._(arg);
             });
           }
           let wargs = wrapArgs(args);
@@ -561,16 +561,16 @@ return ${target}`;
       return this.$eval(...form);
     },
 
-    fnargs($fn) {
-      return [...new Array($fn.length)].map(_ => 'any');
+    _fnargs($fn) {
+      return [...new Array($fn.length)].map(_ => ({}));
     },
 
     $boot() {
       for (let fname in this) {
         const fn = this[fname];
         if (typeof fn === 'function' && fname[0] !== '_') {
-          console.log('boot', fname, fn.length);
-          const args = this.fnargs(fn);
+          console.log('boot', fname, fn.length, this._fnargs(fn));
+          const args = this._fnargs(fn);
           this[fname] = this._fn(fn, fname, args, false);
           if (this.nativecomps[fname]) {
             this[fname].comp = this.nativecomps[fname];
