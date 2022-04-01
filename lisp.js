@@ -16,9 +16,6 @@ export class OpStr {
   constructor(s) {
     this.str = s;
   }
-  // [util.inspect.custom](depth, opts) {
-  //   return '`' + this.name + '`';
-  // }
 
   toString() {
     return this.str;

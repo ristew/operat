@@ -70,9 +70,9 @@ export function classDef(supers, slots) {
 
 // toy example
 function testObject() {
-  const Shape = classDef([], [
-    { name: 'area', type: 'function', args: [], returns: 'number', virtual: true },
-  ]);
+  const Shape = classDef([], {
+    area: { type: 'function', args: [], returns: 'number', virtual: true },
+  });
 
   /*
    * (class Circle (Shape Point)
@@ -117,3 +117,20 @@ function testObject() {
   circ.translate(4, 2);
   console.log(circ.x, circ.y);
 }
+
+/* vtable: addMethod, lookup, allocate, delegated?
+ * symbol: intern
+ * closure: new
+ */
+
+// const symbol = classDef([], {
+//   // TODO; should really be set
+//   symlist: { type: [s`list`, s`symbol`], static: true, default: [] },
+//   intern: { type: 'method', static: true, args: { sym: 'string' } }, returns: 'symbol', fn(sym) {
+//     let found = this.symlist.find(s => s.toString() === sym);
+//     if (found) return found;
+//     let symbol = symbol.new(sym);
+//     this.symlist.push(symbol);
+//     return symbol;
+//   }
+// })
