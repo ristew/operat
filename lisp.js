@@ -30,13 +30,21 @@ export function isvau(fname) {
 export function newenv() {
   let env = {
     class($supers, $slotDefs) {
-      return classDef(this.mapeval(supers), slotDefs);
+      return classDef(this.mapeval($supers), $slotDefs);
     },
     defclass($name, $supers, ...$slotDefs) {
-      this.define(name, this.class(supers, slotDefs));
+      this.define($name, this.class($supers, $slotDefs));
     },
-    make(class, ...$inits) {
-      return class.instantiate(...$inits);
+    make(klass, ...$inits) {
+      return klass.instantiate(...$inits);
+    },
+
+    getclass(o) {
+      if (o.proto) {
+        return o.proto;
+      } else if (typeof o === 'number') {
+        return
+      }
     },
 
     cons(a, b) {
@@ -46,7 +54,6 @@ export function newenv() {
         return [a, b];
       }
     },
-
 
     '*': (a, b) => a * b,
     '/': (a, b) => a / b,
@@ -61,28 +68,9 @@ export function newenv() {
       return l.slice(1);
     },
 
-    $cdr(l) {
-      return l.slice(1);
-    },
-
     log(...args) {
-      let printed = args.map(a => this.print($(a)));
+      let printed = args.map(a => this.print.$(a));
       console.log(...printed);
-    },
-
-    shoulddebug: {},
-    dodebug($item) {
-      this.shoulddebug[item] = true;
-    },
-
-    cleardebug() {
-      this.shoulddebug = {};
-    },
-
-    debug(subject, ...args) {
-      if (this.shoulddebug[subject]) {
-        this.log.apply(this, [subject, ...args]);
-      }
     },
 
     typeof(o) {
@@ -90,11 +78,7 @@ export function newenv() {
     },
 
     printlist(os) {
-      return os.map(e => this.print($(e))).join(' ');
-    },
-
-    $vaup(fn) {
-      return isvau(this.$name(fn));
+      return os.map(e => this.print.$(e)).join(' ');
     },
 
     $dbg(...args) {

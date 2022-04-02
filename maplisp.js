@@ -58,7 +58,7 @@ const base = {
     if (token === '(') {
       let sexp = [];
       while (toks[0] !== ')') {
-        sexp.push(readTokens(toks));
+        sexp.push(this.readTokens(toks));
       }
       toks.shift();
       return sexp;
@@ -67,9 +67,9 @@ const base = {
     } else if (token === '{') {
       let map = {};
       while (toks[0] !== '}') {
-        const name = readTokens(toks);
-        const sep = readTokens(toks);
-        const val = readTokens(toks);
+        const name = this.readTokens(toks);
+        const sep = this.readTokens(toks);
+        const val = this.readTokens(toks);
         if (sep !== ':') {
           // raise hell
           throw new Error('invalid map sep ' + sep);
@@ -89,4 +89,4 @@ const base = {
 let prog = readFileSync('./mapcore.operat').toString();
 
 console.log(prog);
-console.log(readTokens(tokenize(prog)));
+console.log(base.readTokens(base.tokenize(prog)));
