@@ -1,15 +1,6 @@
 
 export function classDef(supers, slots) {
   let proto = {
-    wrapFn(fn) {
-      return new Proxy(fn, {
-        apply(target, thisArg, args) {
-          // console.log(target.def.name);
-          let res = target.apply(thisArg, args);
-          return res;
-        }
-      })
-    },
     addSlot(slotDef) {
       console.log('addSlot', slotDef);
       let name = slotDef.name;

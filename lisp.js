@@ -60,8 +60,11 @@ export function newenv() {
     '+': (a, b) => a + b,
     '-': (a, b) => a - b,
 
-    car(l) {
-      return l[0];
+    car: {
+      args: { l: 'list' },
+      fn: car(l) {
+        return l[0];
+      },
     },
 
     cdr(l) {
@@ -81,16 +84,14 @@ export function newenv() {
       return os.map(e => this.print.$(e)).join(' ');
     },
 
-    $dbg(...args) {
-      let res = this.$eval(...args);
-      this.$log(args, res);
+    dbg(...$args) {
+      let res = this.eval(...$args);
+      this.log.$($args, res);
       return res;
     },
 
-    $print(o) {
-      if (o instanceof Error) {
-        return o.stack;
-      } else if (this.$symbolp._(o)) {
+    print(o) {
+      if (typeof o === 'number' || typeof o === 'string') {
         return o;
       } else if (this.$numberp._(o)) {
         return o;
@@ -104,7 +105,7 @@ export function newenv() {
         return `(${this.$printlist._(o)})`;
       } else if (this.$functionp._(o)) {
         let name = this.$name._(o);
-        return `(${this.$vaup._(o) ? '$vau' : '$lambda'} ${name})`;
+        return `(fref ${name})`;
       } else if (this.$objp._(o)) {
         return `\n(obj ${this.$printlist._(Object.entries(o))})\n`
       } else if (this.$booleanp._(o)) {
