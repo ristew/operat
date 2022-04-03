@@ -1,39 +1,6 @@
-(+ 1 2)
-(* 3 4)
-
-;; metacircularity is hard, man
-;; vtable: addMethod, lookup, allocate, delegated?
-;; symbol: intern
-;; closure: new
-;; const symbol = classDef([], {
-;;   // TODO; should really be set
-;;   symlist: { type: [s`list`, s`symbol`], static: true, default: [] },
-;;   intern: {
-;;     type: 'method',
-;;     static: true,
-;;     args: { sym: 'string' },
-;;     returns: 'symbol',
-;;     fn(sym) {
-;;       let found = this.symlist.find(s => s.toString() === sym);
-;;       if (found) return found;
-;;       let symbol = symbol.new(sym);
-;;       this.symlist.push(symbol);
-;;       return symbol;
-;;     }
-;;   },
-;; });
-;;
-;; (class vtable () {
-;;   table: {
-;;     type: (map symbol closure)
-;;     default: {}
-;;   }
-;;   addMethod: {
-;;     type: method
-;;     args: {
-;;       symbol: symbol
-;;       m: method
-;;     }
-;;     fn: (lambda (symbol m) (-> table set symbol m))
-;;   }
-;; })
+(class frob () {
+  test: {
+    type: number
+    default: 1
+  }
+})

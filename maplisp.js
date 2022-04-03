@@ -2,17 +2,53 @@
  * Okay, so operat v0 is toast. Vau calculus is proven, but I've decided to try
  * to extend Lisp with homoiconic maps in code. Also, base things earlier on the
  * object system, and just keep things tidier. This time it might count!
- *
- * Tokenize
- *
  */
 
 import { readFileSync } from 'fs';
 import { classDef } from './objet.js';
 
-const parser = classDef([], {
+const Env = classDef([], {
+  parent: {
+    type: ['maybe', 'self'],
+    default: null,
+  },
+
+  scope: {
+    type: 'map',
+    default: {},
+  },
+
+  define: {
+    type: 'method',
+    args: [{ name: 'name', type: 'string' }, { name: 'value', type: 'any' }],
+    fn(name, value) {
+      this.scope[name] = value;
+    }
+  },
+
+  lookup: {
+    type: 'function',
+    args: [{ name: 'name', type: 'string' }],
+    returns: ['maybe', 'any'],
+    fn(name) {
+      if (name in this.scope) {
+        return this.scope[name];
+      } else if (this.parent !== null) {
+        return this.parent.lookup(name);
+      } else {
+        return null;
+      }
+    }
+  },
+});
+
+let env = Env.instantiate();
+env.define('Env', Env);
+
+env.define('Parser', classDef([], {
   fromSource: {
     static: true,
+    type: 'function',
     args: [{ name: 's', type: 'string' }],
     returns: 'self',
     fn(s) {
@@ -104,9 +140,9 @@ const parser = classDef([], {
       return prog;
     }
   },
-});
+}));
 
 let prog = readFileSync('./mapcore.operat').toString();
 
-const p = parser.fromSource(prog);
-console.log(p.parse());
+const p = env.lookup('Parser').fromSource(prog);
+console.log(JSON.stringify(p.parse(), null, 2));
