@@ -1,3 +1,6 @@
+(+ 1 2)
+(* 3 4)
+
 ;; metacircularity is hard, man
 ;; vtable: addMethod, lookup, allocate, delegated?
 ;; symbol: intern
@@ -19,18 +22,18 @@
 ;;     }
 ;;   },
 ;; });
-
-(class vtable () {
-  table: {
-    type: (map symbol closure)
-    default: {}
-  }
-  addMethod: {
-    type: method
-    args: {
-      symbol: symbol
-      m: method
-    }
-    fn: (lambda (symbol m) (-> table set symbol m))
-  }
-})
+;;
+;; (class vtable () {
+;;   table: {
+;;     type: (map symbol closure)
+;;     default: {}
+;;   }
+;;   addMethod: {
+;;     type: method
+;;     args: {
+;;       symbol: symbol
+;;       m: method
+;;     }
+;;     fn: (lambda (symbol m) (-> table set symbol m))
+;;   }
+;; })

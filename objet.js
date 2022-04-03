@@ -1,18 +1,28 @@
 
 export function classDef(supers, slots) {
   let proto = {
-    addSlot(slotDef) {
-      console.log('addSlot', slotDef);
-      let name = slotDef.name;
+    wrapFn(def, bind = this) {
+      let fn = def.fn.bind(bind);
+      for (let prop in def) {
+        if (prop !== 'fn') {
+          fn[prop] = def[prop];
+        }
+      }
+      return fn;
+    },
+    addSlot(name, slotDef) {
+      // console.log('addSlot', name, slotDef);
       // check if a slot is being shadowed
       let cur = this[name];
       if (cur) {
         // console.log('shadowed', name);
-        slotDef = { ...cur, ...slotDef };
+        this[name] = { ...cur, ...slotDef };
+      } else if (slotDef.static) {
+        this[name] = this.wrapFn(slotDef);
       } else {
         this.slots.push(name);
+        this[name] = slotDef;
       }
-      this[name] = slotDef;
     },
 
     mergeSuper(sup) {
@@ -32,8 +42,7 @@ export function classDef(supers, slots) {
         } else if (def.hasOwnProperty('default')) {
           o[slot] = def.default;
         } else if (['method', 'function'].includes(def.type)) {
-          o[slot] = this.wrapFn(def[def.name]);
-          o[slot].def = def;
+          o[slot] = this.wrapFn(def, o);
         } else if (def.optional) {
           o[slot] = null;
         } else {
@@ -52,76 +61,9 @@ export function classDef(supers, slots) {
   for (let sup of supers.slice().reverse()) {
     proto.mergeSuper(sup);
   }
-  for (let slot of slots) {
-    proto.addSlot(slot);
+  for (let [slotName, slotDef] of Object.entries(slots)) {
+    proto.addSlot(slotName, slotDef);
   }
 
   return proto;
 }
-
-// toy example
-function testObject() {
-  const Shape = classDef([], {
-    area: { type: 'function', args: [], returns: 'number', virtual: true },
-  });
-
-  /*
-   * (class Circle (Shape Point)
-   *   (r type number default 1)
-   *   (area method () (* Math.PI (pow r 2))))
-   */
-  const Point = classDef([], [
-    { name: 'x', type: 'number', default: 0 },
-    { name: 'y', type: 'number', default: 0 },
-    {
-      name: 'translate',
-      type: 'method',
-      args: [
-        { name: 'dx', type: 'number', default: 0 },
-        { name: 'dy', type: 'number', default: 0 },
-      ],
-      returns: 'self',
-      translate(dx, dy) {
-        this.x += dx;
-        this.y += dy;
-      }
-    }
-  ]);
-
-  const Circle = classDef([Shape, Point], [
-    { name: 'r', type: 'number', default: 1 },
-    { name: 'area', type: 'function', args: [], returns: 'number', area() { return Math.PI * this.r**2; } },
-  ]);
-
-  const Rect = classDef([Shape, Point], [
-    { name: 'h', type: 'number', default: 1 },
-    { name: 'l', type: 'number', default: 1 },
-    { name: 'area', type: 'function', args: [], returns: 'number', area() { return this.h * this.l; } },
-  ]);
-
-  let circ = Circle.instantiate();
-  let rect = Rect.instantiate({ l: 3 });
-
-  console.log(circ.area());
-  console.log(rect.area());
-  circ.translate(2, 3);
-  circ.translate(4, 2);
-  console.log(circ.x, circ.y);
-}
-
-/* vtable: addMethod, lookup, allocate, delegated?
- * symbol: intern
- * closure: new
- */
-
-// const symbol = classDef([], {
-//   // TODO; should really be set
-//   symlist: { type: [s`list`, s`symbol`], static: true, default: [] },
-//   intern: { type: 'method', static: true, args: { sym: 'string' } }, returns: 'symbol', fn(sym) {
-//     let found = this.symlist.find(s => s.toString() === sym);
-//     if (found) return found;
-//     let symbol = symbol.new(sym);
-//     this.symlist.push(symbol);
-//     return symbol;
-//   }
-// })

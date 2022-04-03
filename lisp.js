@@ -62,7 +62,7 @@ export function newenv() {
 
     car: {
       args: { l: 'list' },
-      fn: car(l) {
+      fn: function car(l) {
         return l[0];
       },
     },
