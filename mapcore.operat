@@ -4,3 +4,10 @@
     default: 1
   }
 })
+
+(match n {
+  1: "one"
+  2: "two"
+  (+ 2 3): "five"
+  _: "not that"
+})

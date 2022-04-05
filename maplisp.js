@@ -45,6 +45,132 @@ const Env = classDef([], {
 let env = Env.instantiate();
 env.define('Env', Env);
 
+env.define('Object', classDef([], {
+
+}));
+
+
+
+env.define('Lexer', classDef([], {
+  source: {
+    type: 'string',
+    doc: 'program source to be lexed',
+  },
+  fromSource: {
+    static: true,
+    type: 'function',
+    args: { 's': { type: 'string' } },
+    returns: 'self',
+    fn(s) {
+      return this.instantiate({ source: s });
+    },
+  },
+  idx: {
+    type: 'number',
+    default: 0,
+    doc: 'current index into the source',
+  },
+  lineNumber: {
+    type: 'number',
+    default: 0,
+    doc: 'current line number',
+  },
+  peek: {
+    type: 'function',
+    returns: 'string',
+    fn() {
+      return this.source[this.idx];
+    },
+  },
+  chomp: {
+    type: 'method',
+    returns: 'string',
+    fn() {
+      if (this.peek() === '\n') {
+        this.lineNumber += 1;
+      }
+      this.idx += 1;
+      return this.peek();;
+    }
+  },
+  undo: {
+    type: 'method',
+    fn() {
+      if (this.peek === '\n') {
+        this.lineNumber--;
+      }
+      this.idx--;
+      return this.source[this.idx];
+    }
+  },
+  ended: {
+    type: 'function',
+    fn() {
+      return this.idx >= this.source.length;
+    }
+  },
+  readToken: {
+    type: 'method',
+    returns: ['?', ['or', 'string', ['list', 'any'], 'number', 'bool']],
+    fn() {
+      if (this.ended()) {
+        return null;
+      }
+      let c = this.peek();
+      if (c === ';') {
+        let comment = '';
+        while (c !== '\n') {
+          comment += c;
+          c = this.chomp();
+        }
+      }
+      while (' \n\t'.includes(c)) {
+        c = this.chomp();
+      }
+      if ('(){}:'.includes(c)) {
+        this.chomp();
+        return c;
+      } else if (c === '"') {
+        let str = '';
+        c = this.chomp();
+        while (c !== '"') {
+          str += c;
+          c = this.chomp();
+        }
+        this.chomp();
+        return ['str', str];
+      } else {
+        let sym = '';
+        while (c && /[^ \n\t(){}:;"]/.test(c)) {
+          sym += c;
+          c = this.chomp();
+        }
+        let float = Number.parseFloat(sym);
+        if (!isNaN(float)) {
+          return float;
+        } else if (sym === 'true' || sym === 'false') {
+          return JSON.parse(sym);
+        } else {
+          return sym;
+        }
+      }
+    },
+  },
+  readToEnd: {
+  type: 'method',
+  returns: ['list', 'any'],
+  fn() {
+    let toks = [];
+    let tok = this.readToken();
+    while (tok !== null) {
+      toks.push(tok);
+      tok = this.readToken();
+    }
+    return toks;
+  }
+}
+}))
+
 env.define('Parser', classDef([], {
   fromSource: {
     static: true,
@@ -52,41 +178,8 @@ env.define('Parser', classDef([], {
     args: [{ name: 's', type: 'string' }],
     returns: 'self',
     fn(s) {
-      let toks = [];
-      for (let i = 0; i < s.length; i++) {
-        let c = s[i];
-        if ('(){}:'.includes(c)) {
-          toks.push(c);
-        } else if (c === ';') {
-          while (s[i] !== '\n') {
-            i++;
-          }
-        } else if (' \n\t'.includes(c)) {
-        } else if (c === '"') {
-          let str = '';
-          i++;
-          while (s[i] !== '"') {
-            str += s[i];
-            i++;
-          }
-          toks.push(new OpStr(str));
-        } else {
-          let sym = '';
-          while (s[i] && /[^ \n\t(){}:;"]/.test(s[i])) {
-            sym += s[i];
-            i++;
-          }
-          i--;
-          let float = Number.parseFloat(sym);
-          if (!isNaN(float)) {
-            toks.push(float);
-          } else if (sym === 'true' || sym === 'false') {
-            toks.push(JSON.parse(sym))
-          } else {
-            toks.push(sym);
-          }
-        }
-      }
+      let lex = env.lookup('Lexer').fromSource(s);
+      let toks = lex.readToEnd();
       return this.instantiate({ tokens: toks });
     },
   },

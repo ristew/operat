@@ -1,3 +1,6 @@
+function genid() {
+  return Math.random().toString(36).slice(2, 10).toUpperCase();
+}
 
 export function classDef(supers, slots) {
   let proto = {
@@ -27,14 +30,16 @@ export function classDef(supers, slots) {
 
     mergeSuper(sup) {
       // console.log(this, sup);
-
       for (let slot of sup.slots) {
-        this.addSlot(sup[slot]);
+        this.addSlot(slot, sup[slot]);
       }
     },
 
     instantiate(passedVals = {}) {
-      let o = { meta: this };
+      let o = {
+        meta: this,
+        id: genid(),
+      };
       for (let slot of this.slots) {
         let def = this[slot];
         if (passedVals[slot]) {
@@ -58,6 +63,7 @@ export function classDef(supers, slots) {
     slots: [],
     type: 'class',
   };
+  // linearize!
   for (let sup of supers.slice().reverse()) {
     proto.mergeSuper(sup);
   }
