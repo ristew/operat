@@ -77,14 +77,18 @@ env.define('Lexer', classDef([], {
   },
   peek: {
     type: 'function',
-    returns: 'string',
+    returns: ['?', 'string'],
     fn() {
-      return this.source[this.idx];
+      if (!this.ended()) {
+        return this.source[this.idx];
+      } else {
+        return null;
+      }
     },
   },
   chomp: {
     type: 'method',
-    returns: 'string',
+    returns: ['?', 'string'],
     fn() {
       if (this.peek() === '\n') {
         this.lineNumber += 1;
@@ -113,19 +117,20 @@ env.define('Lexer', classDef([], {
     type: 'method',
     returns: ['?', ['or', 'string', ['list', 'any'], 'number', 'bool']],
     fn() {
-      if (this.ended()) {
-        return null;
-      }
       let c = this.peek();
-      if (c === ';') {
-        let comment = '';
-        while (c !== '\n') {
-          comment += c;
-          c = this.chomp();
+      while (' \n\t;'.includes(c)) {
+        if (c === ';') {
+            let comment = '';
+            while (c !== '\n') {
+            comment += c;
+            c = this.chomp();
+            }
+        } else {
+            c = this.chomp();
         }
       }
-      while (' \n\t'.includes(c)) {
-        c = this.chomp();
+      if (this.ended()) {
+        return null;
       }
       if ('(){}:'.includes(c)) {
         this.chomp();

@@ -1,4 +1,4 @@
-(class frob () {
+(class frob () { ; frobulent!
   test: {
     type: number
     default: 1
@@ -8,6 +8,6 @@
 (match n {
   1: "one"
   2: "two"
-  (+ 2 3): "five"
+; TODO  (+ 2 3): "five"
   _: "not that"
 })
