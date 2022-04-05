@@ -49,15 +49,16 @@ const Env = classDef([], {
 const Object = classDef([], {
   jsproto: {
     static: true,
-    type: 'any',
+    type: ['?', 'any'],
+    optional: true,
     doc: 'Javascript prototype to set __proto__ to, like Array.prototype',
   },
 })
 
 const List = classDef([Object], {
-  jsproto: Array.prototype,
+});
 
-})
+console.log(List.instantiate());
 
 let env = Env.instantiate();
 env.define('Env', Env);

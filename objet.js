@@ -51,22 +51,55 @@ export function classDef(supers, slots) {
         if (passedVals[slot]) {
           o[slot] = passedVals[slot];
         } else if (def.hasOwnProperty('default')) {
-          o[slot] = def.default;
         } else if (slotDefIsFn(def)) {
-          o[slot] = this.wrapFn(def, o);
+          // o[slot] = this.wrapFn(def, o);
         } else if (def.optional) {
           o[slot] = null;
         } else {
           throw new Error('Missing value in instantiation: ' + slot);
         }
       }
-      return o;
+      return new Proxy(o, {
+        get(target, p) {
+          if (!(p in target)) {
+            let found = target.meta.find(p);
+            if (found !== null) {
+              target[p] = found;
+            }
+            // Be fussy on undefined?
+          }
+          return target[p];
+        }
+      });
+    },
+
+    find(name) {
+      if (name in this) {
+        let slotDef = this[name];
+        if ('default' in slotDef) {
+          return slotDef.default;
+        } else if (slotDefIsFn(slotDef)) {
+          return slotDef.fn;
+        } else {
+          console.log('find', name, slotDef);
+          throw new Error('found something wrong');
+        }
+      } else {
+        for (let sup of proto.supers) {
+          let found = sup.find(name);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
     },
     slots: [],
+    supers: supers.slice().reverse(),
     type: 'object',
   };
   // linearize!
-  for (let sup of supers.slice().reverse()) {
+  for (let sup of proto.supers) {
     proto.mergeSuper(sup);
   }
   for (let [slotName, slotDef] of Object.entries(slots)) {
