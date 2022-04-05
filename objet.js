@@ -2,6 +2,10 @@ function genid() {
   return Math.random().toString(36).slice(2, 10).toUpperCase();
 }
 
+function slotDefIsFn(def) {
+  return ['method', 'function'].includes(def.type);
+}
+
 export function classDef(supers, slots) {
   let proto = {
     wrapFn(def, bind = this) {
@@ -21,7 +25,9 @@ export function classDef(supers, slots) {
         // console.log('shadowed', name);
         this[name] = { ...cur, ...slotDef };
       } else if (slotDef.static) {
-        this[name] = this.wrapFn(slotDef);
+        if (slotDefIsFn(slotDef)) {
+          this[name] = this.wrapFn(slotDef);
+        }
       } else {
         this.slots.push(name);
         this[name] = slotDef;
@@ -46,7 +52,7 @@ export function classDef(supers, slots) {
           o[slot] = passedVals[slot];
         } else if (def.hasOwnProperty('default')) {
           o[slot] = def.default;
-        } else if (['method', 'function'].includes(def.type)) {
+        } else if (slotDefIsFn(def)) {
           o[slot] = this.wrapFn(def, o);
         } else if (def.optional) {
           o[slot] = null;
@@ -54,14 +60,10 @@ export function classDef(supers, slots) {
           throw new Error('Missing value in instantiation: ' + slot);
         }
       }
-      return new Proxy(o, {
-        get(target, p) {
-          return target[p];
-        },
-      });
+      return o;
     },
     slots: [],
-    type: 'class',
+    type: 'object',
   };
   // linearize!
   for (let sup of supers.slice().reverse()) {
