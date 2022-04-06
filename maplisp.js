@@ -24,8 +24,9 @@ const Env = classDef([], {
     args: [{ name: 'name', type: 'string' }, { name: 'value', type: 'any' }],
     fn(name, value) {
       if (typeof value === 'function') {
-        value = value.bind(this);
+        value = this.wrapFn(value);
       }
+      console.log(this);
       this.scope[name] = value;
     }
   },

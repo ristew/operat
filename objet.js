@@ -62,7 +62,8 @@ export function classDef(supers, slots) {
       return new Proxy(o, {
         get(target, p) {
           if (!(p in target)) {
-            let found = target.meta.find(p);
+            let found = target.meta.find(p, target);
+            console.log('lookup', p, target, found)
             if (found !== null) {
               target[p] = found;
             }
@@ -73,20 +74,21 @@ export function classDef(supers, slots) {
       });
     },
 
-    find(name) {
+    find(name, target = this) {
       if (name in this) {
         let slotDef = this[name];
+          console.log('find', name, slotDef);
         if ('default' in slotDef) {
           return slotDef.default;
         } else if (slotDefIsFn(slotDef)) {
-          return slotDef.fn;
+          return this.wrapFn(slotDef, target);
         } else {
           console.log('find', name, slotDef);
           throw new Error('found something wrong');
         }
       } else {
         for (let sup of proto.supers) {
-          let found = sup.find(name);
+          let found = sup.find(name, target);
           if (found) {
             return found;
           }
