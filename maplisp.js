@@ -58,10 +58,7 @@ const Object = classDef([], {
 const List = classDef([Object], {
 });
 
-console.log(List.instantiate());
-
 let env = Env.instantiate();
-console.log(env.scope);
 env.define('Env', Env);
 env.define('Lexer', Lexer);
 env.define('Parser', Parser);

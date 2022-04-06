@@ -54,12 +54,10 @@ export function classDef(supers, slots) {
           throw new Error('Missing value in instantiation: ' + slot);
         }
       }
-      return new Proxy(o, {
+      let proxy = new Proxy(o, {
         get(target, p) {
-          console.log('get', p, target)
           if (!(p in target)) {
-            let found = target.meta.find(p, o);
-            console.log('lookup', p, target, found)
+            let found = target.meta.find(p, proxy);
             if (found !== null) {
               target[p] = found;
             }
@@ -68,18 +66,17 @@ export function classDef(supers, slots) {
           return target[p];
         }
       });
+      return proxy;
     },
 
     find(name, target = this) {
       if (name in this) {
         let slotDef = this[name];
-          console.log('find', name, slotDef);
         if ('default' in slotDef) {
           return slotDef.default;
         } else if (slotDefIsFn(slotDef)) {
           return this.wrapFn(slotDef, target);
         } else {
-          console.log('find', name, slotDef);
           throw new Error('found something wrong');
         }
       } else {
