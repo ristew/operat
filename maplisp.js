@@ -24,9 +24,8 @@ const Env = classDef([], {
     args: [{ name: 'name', type: 'string' }, { name: 'value', type: 'any' }],
     fn(name, value) {
       if (typeof value === 'function') {
-        value = this.wrapFn(value);
+        value = value.bind(this);
       }
-      console.log(this);
       this.scope[name] = value;
     }
   },
@@ -62,6 +61,7 @@ const List = classDef([Object], {
 console.log(List.instantiate());
 
 let env = Env.instantiate();
+console.log(env.scope);
 env.define('Env', Env);
 env.define('Lexer', Lexer);
 env.define('Parser', Parser);

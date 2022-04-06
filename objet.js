@@ -50,19 +50,15 @@ export function classDef(supers, slots) {
         let def = this[slot];
         if (passedVals[slot]) {
           o[slot] = passedVals[slot];
-        } else if (def.hasOwnProperty('default')) {
-        } else if (slotDefIsFn(def)) {
-          // o[slot] = this.wrapFn(def, o);
-        } else if (def.optional) {
-          o[slot] = null;
-        } else {
+        } else if (!def.optional && !('default' in def) && !slotDefIsFn(def)) {
           throw new Error('Missing value in instantiation: ' + slot);
         }
       }
       return new Proxy(o, {
         get(target, p) {
+          console.log('get', p, target)
           if (!(p in target)) {
-            let found = target.meta.find(p, target);
+            let found = target.meta.find(p, o);
             console.log('lookup', p, target, found)
             if (found !== null) {
               target[p] = found;
