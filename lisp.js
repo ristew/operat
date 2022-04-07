@@ -8,7 +8,6 @@
  * trying to make fexprs work a la kernel
  * applicatives are normal, operatives start with $
  */
-import { classDef } from './object'
 export class OpSymbol {
   constructor(s) {
     this.name = s;
