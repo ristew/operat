@@ -1,1 +1,17 @@
 (log "hello, world")
+
+(defmacro defclass {
+  name: symbol
+  direct-superclasses: list
+  direct-slots: map
+} ())
+
+(defclass standard-class () {
+  name: symbol
+  direct-superclasses: list
+  direct-slots: list
+  class-precedence-list: list
+  effective-slots: list
+  direct-subclasses: list
+  direct-methods: list
+})

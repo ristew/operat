@@ -5,64 +5,22 @@
  */
 
 import { readFileSync } from 'fs';
-import { classDef } from './objet.js';
+import { bootObjet } from './objet.js';
 import { Lexer, Parser } from './read.js';
 
-const Env = classDef([], {
-  parent: {
-    type: ['maybe', 'self'],
-    default: null,
-  },
-
-  scope: {
-    type: 'map',
-    default: {},
-  },
-
-  define: {
-    type: 'method',
-    args: [{ name: 'name', type: 'string' }, { name: 'value', type: 'any' }],
-    fn(name, value) {
-      if (typeof value === 'function') {
-        value = value.bind(this);
-      }
-      this.scope[name] = value;
-    }
-  },
-
-  lookup: {
-    type: 'function',
-    args: [{ name: 'name', type: 'string' }],
-    returns: ['maybe', 'any'],
-    fn(name) {
-      if (name in this.scope) {
-        return this.scope[name];
-      } else if (this.parent !== null) {
-        return this.parent.lookup(name);
-      } else {
-        return null;
-      }
-    }
-  },
-});
-
-const Object = classDef([], {
-  jsproto: {
-    static: true,
-    type: ['?', 'any'],
-    optional: true,
-    doc: 'Javascript prototype to set __proto__ to, like Array.prototype',
-  },
-})
-
-const List = classDef([Object], {
-});
-
-let env = Env.instantiate();
-env.define('Env', Env);
+let env = bootObjet();
 env.define('Lexer', Lexer);
 env.define('Parser', Parser);
 env.define('log', (...s) => console.log(...s));
+env.define('classOf', (t) => {
+  if (typeof t === 'number') {
+
+  } else if (typeof t === 'string') {
+
+  } else if (Array.isArray(t)) {
+
+  }
+})
 env.define('eval', function (form) {
 
 })
