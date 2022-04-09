@@ -11,7 +11,12 @@ export const StandardClass = {
   instantiate: function({ supers, slots }) {
     let proto = {
       wrapFn(def, bind = this) {
-        let fn = def.fn.bind(bind);
+//        let fn = def.fn.bind(bind);
+        let fn = new Proxy(def.fn, {
+          apply(target, thisArg, args) {
+            return target.apply(bind, args);
+          }
+        });
         for (let prop in def) {
           if (prop !== 'fn') {
             fn[prop] = def[prop];
@@ -56,11 +61,13 @@ export const StandardClass = {
             throw new Error('Missing value in instantiation: ' + slot);
           }
         }
-        let proxy = new Proxy(o, {
-          get(target, p) {
+        return new Proxy(o, {
+          get(target, p, receiver) {
             if (!(p in target)) {
-              let found = target.meta.find(p, proxy);
-              if (found !== null) {
+              let found = target.meta.find(p, receiver);
+              if (found === undefined) {
+                throw new Error("couldn't find " + p);
+              } else if (found !== null) {
                 target[p] = found;
               }
               // Be fussy on undefined?
@@ -68,7 +75,6 @@ export const StandardClass = {
             return target[p];
           }
         });
-        return proxy;
       },
 
       find(name, target = this) {
@@ -90,6 +96,9 @@ export const StandardClass = {
           }
         }
         return null;
+      },
+      call(method, ...args) {
+        let mfn = this.find(method).bind(this);
       },
       slots: [],
       supers: [...supers.slice().reverse(), StandardClass],
@@ -165,8 +174,8 @@ export function bootObjet() {
     args: 'Args',
     methods: [],
   }))
-  env.define('defgeneric', function(name, args) {
-    return this.Generic.instantiate({ name })
+  env.define('defgeneric', function($name, $args) {
+    return this.Generic.instantiate({ name: $name, args: $args })
   })
   env.define('Method', classDef([], {
     env: 'Env',
@@ -176,6 +185,10 @@ export function bootObjet() {
     body: 'Function',
     generic: 'Generic',
   }));
+
+  env.define('defmethod', function($name, $args, $body) {
+    return this.Method.instantiate(this, $args)
+  })
 
   return env;
 }
