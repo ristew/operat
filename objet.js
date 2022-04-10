@@ -174,8 +174,11 @@ export function bootObjet() {
     args: 'Args',
     methods: [],
   }))
+  env.define('generics', {});
   env.define('defgeneric', function($name, $args) {
-    return this.Generic.instantiate({ name: $name, args: $args })
+    let generic = this.lookup('Generic').instantiate({ name: $name, args: $args });
+    env.lookup('generics')[$name] = generic;
+    return generic;
   })
   env.define('Method', classDef([], {
     env: 'Env',
@@ -187,7 +190,14 @@ export function bootObjet() {
   }));
 
   env.define('defmethod', function($name, $args, $body) {
-    return this.Method.instantiate(this, $args)
+    let generic = this.lookup('generics')[$name];
+    let method = this.lookup('Method').instantiate({
+      env: this,
+      args: $args,
+      body: $body, // compile??
+      classes: [],
+      generic,
+    });
   })
 
   return env;
