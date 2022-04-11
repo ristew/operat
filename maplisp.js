@@ -6,7 +6,7 @@
 
 import { readFileSync } from 'fs';
 import { bootObjet } from './objet.js';
-import { Lexer, Parser } from './read.js';
+import { Lexer, Parser, sourceToParser } from './read.js';
 
 let env = bootObjet();
 env.define('Lexer', Lexer);
@@ -27,5 +27,5 @@ env.define('eval', function (form) {
 
 let prog = readFileSync('./mapcore.operat').toString();
 
-const p = env.lookup('Parser').fromSource(prog);
+const p = sourceToParser(prog);
 env.lookup('log')(JSON.stringify(p.parse(), null, 2));

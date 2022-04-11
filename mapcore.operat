@@ -15,3 +15,8 @@
   direct-subclasses: list
   direct-methods: list
 })
+
+(method square Number () (* this this))
+(~ 5 square)
+(\ 5 square)
+; typing 5\ will get you to (\ 5 square)

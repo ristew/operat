@@ -11,7 +11,6 @@ export const StandardClass = {
   instantiate: function({ supers, slots }) {
     let proto = {
       wrapFn(def, bind = this) {
-//        let fn = def.fn.bind(bind);
         let fn = new Proxy(def.fn, {
           apply(target, thisArg, args) {
             return target.apply(bind, args);
@@ -25,11 +24,9 @@ export const StandardClass = {
         return fn;
       },
       addSlot(name, slotDef) {
-        // console.log('addSlot', name, slotDef);
         // check if a slot is being shadowed
         let cur = this[name];
         if (cur) {
-          // console.log('shadowed', name);
           this[name] = { ...cur, ...slotDef };
         } else if (slotDef.static) {
           if (slotDefIsFn(slotDef)) {
@@ -42,7 +39,6 @@ export const StandardClass = {
       },
 
       mergeSuper(sup) {
-        // console.log(this, sup);
         for (let slot of sup.slots) {
           this.addSlot(slot, sup[slot]);
         }
@@ -53,7 +49,7 @@ export const StandardClass = {
           meta: this,
           id: genid(),
         };
-        for (let slot of this.slots) {
+        for (let slot of this.slots.filter(s => s !== 'methods')) {
           let def = this[slot];
           if (passedVals[slot]) {
             o[slot] = passedVals[slot];
@@ -82,11 +78,15 @@ export const StandardClass = {
           let slotDef = this[name];
           if ('default' in slotDef) {
             return slotDef.default;
-          } else if (slotDefIsFn(slotDef)) {
-            return this.wrapFn(slotDef, target);
+          } else if (typeof slotDef === 'function') {
+            return slotDef;
           } else {
+            console.log(slotDef);
             throw new Error('found something wrong');
           }
+        } else if (name in this.methods) {
+          this[name] = this.wrapFn(this.methods[name], target);
+          return this[name];
         } else {
           for (let sup of proto.supers) {
             let found = sup.find(name, target);
@@ -122,41 +122,50 @@ export function classDef($supers, $slots) {
 
 export const Env = classDef([], {
   parent: {
-    type: ['maybe', 'self'],
     default: null,
   },
 
   scope: {
-    type: 'map',
     default: {},
   },
 
-  define: {
-    type: 'method',
-    args: { name: 'string', value: 'any' },
-    fn(name, value) {
-      if (typeof value === 'function') {
-        value = value.bind(this);
-      }
-      this.scope[name] = value;
-      return value;
-    }
-  },
+  methods: {
+    class: {
+      type: 'method',
+      args: { $name: 'Symbol', $supers: 'List', $slots: 'Map' },
+      fn($name, $supers, $slots) {
+        this[$name] = StandardClass.instantiate({ supers: $supers, slots: $slots });
+        return this[$name];
+      },
+    },
 
-  lookup: {
-    type: 'function',
-    args: [{ name: 'name', type: 'string' }],
-    returns: ['maybe', 'any'],
-    fn(name) {
-      if (name in this.scope) {
-        return this.scope[name];
-      } else if (this.parent !== null) {
-        return this.parent.lookup(name);
-      } else {
-        return null;
+    define: {
+      type: 'method',
+      args: { name: 'symbol', value: 'any' },
+      fn(name, value) {
+        if (typeof value === 'function') {
+          value = value.bind(this);
+        }
+        this.scope[name] = value;
+        return value;
       }
-    }
-  },
+    },
+
+    lookup: {
+      type: 'function',
+      args: [{ name: 'name', type: 'string' }],
+      returns: ['maybe', 'any'],
+      fn(name) {
+        if (name in this.scope) {
+          return this.scope[name];
+        } else if (this.parent !== null) {
+          return this.parent.lookup(name);
+        } else {
+          return null;
+        }
+      }
+    },
+  }
 });
 
 export function bootObjet() {
@@ -164,11 +173,11 @@ export function bootObjet() {
   env.define('Env', Env);
   env.define('StandardClass', StandardClass);
   env.define('defclass', classDef);
-  env.define('Arg', classDef([], {
+  env.class('Arg', [], {
     name: 'Symbol',
     type: 'Any', // ??
     default: 'Any',
-  }));
+  });
   env.define('Generic', classDef([], {
     name: 'Symbol',
     args: 'Args',
@@ -189,6 +198,7 @@ export function bootObjet() {
     generic: 'Generic',
   }));
 
+  env.define('methods', {});
   env.define('defmethod', function($name, $args, $body) {
     let generic = this.lookup('generics')[$name];
     let method = this.lookup('Method').instantiate({
@@ -198,7 +208,8 @@ export function bootObjet() {
       classes: [],
       generic,
     });
-  })
+    env.lookup('methods')[$name] = method;
+  });
 
   return env;
 }
