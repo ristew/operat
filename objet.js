@@ -6,8 +6,37 @@ function slotDefIsFn(def) {
   return ['method', 'function'].includes(def.type);
 }
 
+function proxyClass(clss) {
+  return new Proxy(clss, {
+    get(target, p, receiver) {
+      if (p in target) {
+        return target[p];
+      } else if (p in target.methods) {
+        let method = target.methods[p];
+        target[p] = new Proxy(method.fn, {
+          apply(fnTarget, thisArg, args) {
+            return fnTarget.apply(receiver, args);
+          }
+        }); // or method.fn.bind(receiver), which is better?
+        return target[p];
+      }
+    },
+  })
+}
+
 export const StandardClass = {
+  // fake metaclass
   slots: [],
+  find: function() {
+    return null;
+  },
+  methods: {
+    instantiate: {
+      fn({ supers, slots }) {
+
+      }
+    }
+  },
   instantiate: function({ supers, slots }) {
     let proto = {
       wrapFn(def, bind = this) {
@@ -56,6 +85,10 @@ export const StandardClass = {
           } else if (!def.optional && !('default' in def) && !slotDefIsFn(def)) {
             throw new Error('Missing value in instantiation: ' + slot);
           }
+        }
+        let jsproto = this.find('jsproto');
+        if (jsproto) {
+          o.__proto__ = jsproto;
         }
         return new Proxy(o, {
           get(target, p, receiver) {
