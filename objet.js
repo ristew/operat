@@ -1,38 +1,60 @@
 /*
- * do OROM but vtables are metaclasses
+ * MetaClass -> Class -> objects
  */
+
+function nativeMethod(fn) {
+  return {
+    method: fn,
+  };
+}
 
 const MetaClass = {
   parents: [],
   methodCache: {},
-  child: {
-    method() {
-      let child = this.new();
-      child.parents = [this];
-      return child;
-    }
-  },
-  lookup: {
-    method(name) {
-      if (this[name]) {
-        return this[name];
-      } else {
-        for (let parent of this.parents) {
-          let found = parent.lookup(name);
-          if (found) {
-            return found;
-          }
+  child: nativeMethod(function() {
+    let child = this.new();
+    child.parents = [this];
+    return child;
+  }),
+  lookup: nativeMethod(function (name) {
+    if (this[name]) {
+      return this[name];
+    } else {
+      for (let parent of this.parents) {
+        let found = send(parent, 'lookup', [name]);
+        if (found) {
+          return found;
         }
       }
     }
-  },
-  new: {
-    method() {
-      return {
-        meta: this,
-      }
+  }),
+  new: nativeMethod(function () {
+    return {
+      meta: this,
+    }
+  }),
+};
+
+const StandardClass = {
+  dispatch(name) {
+    if (name in this) {
+      return this[name];
+    } else {
+      findMeta(this).dispatch(name);
     }
   },
+  instatiate(args) {
+
+  },
+  call(name, args) {
+    let fn = this.dispatch(name);
+    if (typeof fn === 'function') {
+      return fn.apply(this, args);
+    } else {
+      console.log(fn);
+      throw new Error('tried to call non function');
+    }
+  }
 };
 
 function findClass(object) {
@@ -47,7 +69,16 @@ function findMeta(object) {
   return object.meta;
 }
 
-function send(object, messageName, args) {
+function construct(objectForm) {
+
+}
+
+function dispatch(object, name) {
+  if (name in object) {
+    return object[name];
+  } else {
+    return dispatch(findMeta(object), name);
+  }
   let meta = findMeta(object);
   return bind(object, messageName).method.apply(object, args);
 }
