@@ -8,6 +8,22 @@ function nativeMethod(fn) {
   };
 }
 
+function dispatch(meta, message) {
+
+}
+
+function send(object, message, args) {
+  return findClass(object).dispatch(message).apply(object, args);
+}
+
+function findClass(object) {
+  if ('meta' in object) {
+    return object.meta;
+  } else if (typeof object === 'number') {
+
+  }
+}
+
 const MetaClass = {
   parents: [],
   methodCache: {},
@@ -56,14 +72,6 @@ const StandardClass = {
     }
   }
 };
-
-function findClass(object) {
-  if ('meta' in object) {
-    return object.meta;
-  } else if (typeof object === 'number') {
-
-  }
-}
 
 function findMeta(object) {
   return object.meta;
