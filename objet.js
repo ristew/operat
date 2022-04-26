@@ -8,12 +8,8 @@ function nativeMethod(fn) {
   };
 }
 
-function dispatch(meta, message) {
-
-}
-
 function send(object, message, args) {
-  return findClass(object).dispatch(message).apply(object, args);
+  return findClass(object).lookup(message).apply(object, args);
 }
 
 function findClass(object) {
@@ -25,14 +21,32 @@ function findClass(object) {
 }
 
 const MetaClass = {
+  slots: {
+    slots: {},
+    parents: [],
+    new(args) {
+      let child = { meta: this };
+      for (let parent of this.parents) {
+        parent.merge(child, args);
+      }
+      this.merge(child, args);
+      return child;
+    },
+    merge(child, args) {
+      for (let [name, def] of Object.entries(this.slots)) {
+        child[name] = send(def, 'default', args[name]);
+      }
+      return child;
+    },
+  },
   parents: [],
-  methodCache: {},
-  child: nativeMethod(function() {
+  child() {
     let child = this.new();
     child.parents = [this];
     return child;
-  }),
-  lookup: nativeMethod(function (name) {
+  },
+  lookup(name) {
+    console.log(this);
     if (this[name]) {
       return this[name];
     } else {
@@ -43,15 +57,21 @@ const MetaClass = {
         }
       }
     }
-  }),
-  new: nativeMethod(function () {
-    return {
-      meta: this,
-    }
-  }),
+  },
 };
+MetaClass.meta = MetaClass;
+
+SlotDefinition = send(MetaClass, 'new', [{
+  slots: {
+    type: 'any',
+  }
+}])
+
+console.log(SlotDefinition)
+
 
 const StandardClass = {
+
   dispatch(name) {
     if (name in this) {
       return this[name];
@@ -59,8 +79,11 @@ const StandardClass = {
       findMeta(this).dispatch(name);
     }
   },
-  instatiate(args) {
-
+  new(args) {
+    let child = { meta: this };
+    for (let [name, val] of Object.entries(args)) {
+      child[name] = merge(val, this[name]);
+    }
   },
   call(name, args) {
     let fn = this.dispatch(name);
@@ -99,5 +122,3 @@ function bind(object, messageName) {
     return send(metaClass, 'lookup', messageName);
   }
 }
-
-MetaClass.meta = MetaClass;
