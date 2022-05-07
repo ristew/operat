@@ -11,7 +11,7 @@ Basic definition:
 
 Compilation to JavaScript:
 
-    %% (log ($compile ($if (lt n 2) 1 (* n (fact (- n 1))))))
-      "this.n < 2 ? 1 : this.n * this.fact('$', this.n - 1)"
+    %% (log ($compile ($if (eq n 0) 1 (* n (fact (- n 1))))))
+    "this.n === 0 ? 1 : this.n * this.fact('$', this.n - 1)"
 
 See core.operat for a very minimal and incomplete standard library and test suite. This isn't really Kernel, or Lisp for that matter, just a weird experiment and demonstration of JavaScript's flexibility. Currently, I'm exploring more object-oriented approaches to language design, so I doubt I will really come back to this.
