@@ -434,7 +434,7 @@ export function newenv() {
         return `${this.$compile(l)}.slice(1)`;
       },
       '~comp'(...args) {
-        return `${this.$compile(args[0])}.apply(this, [${this.$mapcompile(args.slice(1)).join(', ')}])`;
+        return `${this.$compile(args[0])}(${this.$mapcompile(args.slice(1)).join(', ')}])`;
         //return `[${this.$repr(args[0])}, ${this.$mapcompile(args)}]`;
       },
       '+comp': function(a, b) {
