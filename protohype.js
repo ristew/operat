@@ -29,7 +29,7 @@ export const Class = {
             return m;
         },
         format() {
-            return `${this.name}{ vars: ${this.vars.properties().format()}, methods: ${this.methods.properties().format()}}`
+            return `Class ${this.name}{ vars: ${this.vars.properties().format()}, methods: ${this.methods.properties().format()}}`
         }
     }
 };
@@ -105,13 +105,15 @@ export function extendProto(proto, cls) {
         proto[name] = cls.methods[name];
     }
 }
-extendProto(Object.prototype, BaseObject);
-extendProto(Array.prototype, BaseArray);
-extendProto(String.prototype, BaseString);
 export function metawire(o, cls=Class) {
     o.__proto__ = cls.methods;
     o.class = cls;
 }
+
+// jack in
 metawire(Class);
 metawire(BaseObject);
+extendProto(Object.prototype, BaseObject);
+extendProto(Array.prototype, BaseArray);
+extendProto(String.prototype, BaseString);
 extendProto(Number.prototype, BaseNumber);
