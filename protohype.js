@@ -67,7 +67,20 @@ export const BaseObject = {
 
     }
 }
-const BaseArray = {
+// jack in
+export function extendProto(proto, cls) {
+    for (let name in cls.methods) {
+        proto[name] = cls.methods[name];
+    }
+}
+export function metawire(o, cls=Class) {
+    o.__proto__ = cls.methods;
+    o.class = cls;
+}
+extendProto(Object.prototype, BaseObject);
+metawire(Class);
+metawire(BaseObject);
+const BaseArray = Class.create({
     name: 'Array',
     vars: {},
     methods: {
@@ -78,8 +91,9 @@ const BaseArray = {
             return `[${this.join(' ')}]`;
         }
     }
-}
-const BaseString = {
+});
+extendProto(Array.prototype, BaseArray);
+const BaseString = Class.create({
     name: 'String',
     vars: {},
     methods: {
@@ -87,8 +101,9 @@ const BaseString = {
             return structuredClone(this);
         }
     }
-}
-export const BaseNumber = {
+});
+extendProto(String.prototype, BaseString);
+export const BaseNumber = Class.create({
     name: 'Number',
     vars: {},
     methods: {
@@ -99,21 +114,23 @@ export const BaseNumber = {
             return this;
         }
     }
-}
-export function extendProto(proto, cls) {
-    for (let name in cls.methods) {
-        proto[name] = cls.methods[name];
-    }
-}
-export function metawire(o, cls=Class) {
-    o.__proto__ = cls.methods;
-    o.class = cls;
-}
-
-// jack in
-metawire(Class);
-metawire(BaseObject);
-extendProto(Object.prototype, BaseObject);
-extendProto(Array.prototype, BaseArray);
-extendProto(String.prototype, BaseString);
+});
 extendProto(Number.prototype, BaseNumber);
+
+// follow interpreter pattern? build up OO AST?
+export const SendExpression = Class.create({
+    name: 'SendExpression',
+    vars: {
+        receiver: null,
+        message: '',
+        args: [],
+    },
+    methods: {
+        eval(passed) {
+
+        }
+    }
+})
+
+export const Interface = Class.create({
+})
