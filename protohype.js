@@ -2,6 +2,10 @@ import * as R from 'ramda';
 import coreJs from 'core-js';
 structuredClone = coreJs.structuredClone;
 
+// without, a strange error:
+// TypeError: Invalid property descriptor. Cannot both specify accessors and a value or writable attribute, #<Object>
+console.log('starting...');
+
 export const Class = {
     name: 'Class',
     vars: {
@@ -12,7 +16,19 @@ export const Class = {
     methods: {
         create(props={}) {
             // a bag of slots
-            const inst = { ...this.vars.clone(), ...props };
+            // const inst = { ...this.vars.clone(), ...props };
+            let inst = {};
+            for (let [k, v] of Object.entries(props)) {
+                if (v !== null && v.hasOwnProperty('class')) {
+                    console.log('inst', k, v);
+                    inst[k] = v.value();
+                } else {
+                    inst[k] = v;
+                }
+            }
+            Object.keys(this.vars)
+                  .filter(v => !inst.hasOwnProperty(v))
+                  .forEach(v => inst[v] = this.vars[v].clone());
             // class.methods is objects proto
             inst.__proto__ = this.methods;
             inst.dontClone('class');
@@ -20,10 +36,13 @@ export const Class = {
             return inst;
         },
 
-
+        // do inheritance
         subclass(props={}) {
+            console.log('subclass', props);
             let m = this.class.create(props);
+            console.log('class created', m)
             m.vars = { ...this.vars, ...m.vars };
+            m.methods = { ...this.methods, ...m.methods };
             m.superclass = this;
             m.methods.__proto__ = this.methods;
             return m;
@@ -44,6 +63,10 @@ export const BaseObject = {
             }
         },
         clone() {
+            // rather hackish
+            if (typeof this === 'string') {
+                return this + '';
+            }
             const noclone = this._noclone || [];
             const take = Object.keys(this).filter(k => !noclone.includes(k));
             let c = { ...R.pick(noclone, this), ...take.reduce((o, k) => {
@@ -63,8 +86,11 @@ export const BaseObject = {
 
         properties() {
             return Object.keys(this);
-        }
+        },
 
+        value() {
+            return this;
+        }
     }
 }
 // jack in
@@ -98,7 +124,7 @@ const BaseString = Class.create({
     vars: {},
     methods: {
         clone() {
-            return structuredClone(this);
+            return this + '';
         }
     }
 });
@@ -117,6 +143,68 @@ export const BaseNumber = Class.create({
 });
 extendProto(Number.prototype, BaseNumber);
 
+export const LazyClass = Class.subclass({
+    name: 'LazyClass',
+    methods: {
+        lambda(fn) {
+            return this.create({
+                fn
+            });
+        }
+    }
+});
+
+export const Lazy = LazyClass.create({
+    vars: {
+        fn: null,
+    },
+    methods: {
+        value() {
+            return this.fn();
+        }
+    }
+});
+
+console.log(Lazy)
+
+export const Interface = Class.create({
+    vars: {
+        super: null,
+        methods: {}, // aka generic functions
+    },
+    methods: {
+
+    }
+});
+
+// typing of a method, args -> ret
+export const MethodDef = Class.create({
+    vars: {
+        args: [],
+        ret: null,
+    }
+});
+
+export const Arg = Class.create({
+    vars: {
+        name: '',
+        type: null,
+    }
+});
+
+export const Expression = Interface.create({
+    super: null,
+    methods: {
+        eval: MethodDef.create({
+            args: [Arg.create({
+                name: 'value',
+                type: Lazy.lambda(??),
+            })],
+            ret: () => Expression,
+        })
+    }
+})
+
 // follow interpreter pattern? build up OO AST?
 export const SendExpression = Class.create({
     name: 'SendExpression',
@@ -130,7 +218,4 @@ export const SendExpression = Class.create({
 
         }
     }
-})
-
-export const Interface = Class.create({
 })
