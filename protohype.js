@@ -15,18 +15,6 @@ export const Class = {
     },
     methods: {
         create(props={}) {
-            // a bag of slots
-            // const inst = { ...this.vars.clone(), ...props };
-            // let inst = {};
-            // for (let [k, v] of Object.entries(props)) {
-            //     console.log('k', k, 'v', v);
-            //     if (v !== null && v.hasOwnProperty('class')) {
-            //         console.log('inst', k, v);
-            //         inst[k] = v.value();
-            //     } else {
-            //         inst[k] = v;
-            //     }
-            // }
             let inst = props;
             Object.keys(this.vars)
                   .filter(v => !inst.hasOwnProperty(v))
@@ -46,9 +34,7 @@ export const Class = {
 
         // do inheritance
         subclass(props={}) {
-            console.log('subclass', props);
             let m = this.class.create(props);
-            console.log('class created', m)
             m.vars = { ...this.vars, ...m.vars };
             m.methods = { ...this.methods, ...m.methods };
             m.superclass = this;
@@ -81,7 +67,7 @@ export const BaseObject = {
             const noclone = this._noclone || [];
             const take = Object.keys(this).filter(k => !noclone.includes(k));
             let c = { ...R.pick(noclone, this), ...take.reduce((o, k) => {
-                console.log('Object clone', k, this[k]);
+                // console.log('Object clone', k, this[k]);
                 o[k] = this[k].clone();
                 return o;
             }, {}) };
@@ -220,6 +206,9 @@ export const Env = [Class, 'create', {
         },
         defclass(obj, meta = Class) {
             return this.define(obj.name, [meta, 'create', obj].eval());
+        },
+        child() {
+            return this.class.create({ parent: this });
         }
     }
 }].eval();

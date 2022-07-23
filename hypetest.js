@@ -103,5 +103,3 @@ const senty = BaseEnv.Sent.create();
 senty.add('test evald class');
 senty.add('very useful');
 senty.add(senty.msgCount());
-
-BaseEnv.lookup('Env').display();
