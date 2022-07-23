@@ -1,4 +1,4 @@
-import { Class  } from './protohype.js';
+import { BaseEnv, Class, q } from './protohype.js';
 
 const Point = Class.create({
     vars: {
@@ -80,3 +80,28 @@ set.union(set2).display();
 (42).display();
 [1, 2, 3].display();
 Set.display();
+
+
+console.log([2, '+', 3].eval());
+BaseEnv.defclass({
+    name: 'Sent',
+    vars: {
+        log: [],
+    },
+    methods: {
+        add(msg) {
+            msg.display();
+            this.log.push(msg);
+        },
+        msgCount() {
+            return this.log.length;
+        }
+    }
+});
+
+const senty = BaseEnv.Sent.create();
+senty.add('test evald class');
+senty.add('very useful');
+senty.add(senty.msgCount());
+
+BaseEnv.lookup('Env').display();

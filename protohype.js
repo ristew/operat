@@ -17,18 +17,26 @@ export const Class = {
         create(props={}) {
             // a bag of slots
             // const inst = { ...this.vars.clone(), ...props };
-            let inst = {};
-            for (let [k, v] of Object.entries(props)) {
-                if (v !== null && v.hasOwnProperty('class')) {
-                    console.log('inst', k, v);
-                    inst[k] = v.value();
-                } else {
-                    inst[k] = v;
-                }
-            }
+            // let inst = {};
+            // for (let [k, v] of Object.entries(props)) {
+            //     console.log('k', k, 'v', v);
+            //     if (v !== null && v.hasOwnProperty('class')) {
+            //         console.log('inst', k, v);
+            //         inst[k] = v.value();
+            //     } else {
+            //         inst[k] = v;
+            //     }
+            // }
+            let inst = props;
             Object.keys(this.vars)
                   .filter(v => !inst.hasOwnProperty(v))
-                  .forEach(v => inst[v] = this.vars[v].clone());
+                  .forEach(v => {
+                      if (this.vars[v] !== null) {
+                          inst[v] = this.vars[v].clone();
+                      } else {
+                          inst[v] = null;
+                      }
+                  });
             // class.methods is objects proto
             inst.__proto__ = this.methods;
             inst.dontClone('class');
@@ -49,7 +57,10 @@ export const Class = {
         },
         format() {
             return `Class ${this.name}{ vars: ${this.vars.properties().format()}, methods: ${this.methods.properties().format()}}`
-        }
+        },
+        eval() {
+            return this;
+        },
     }
 };
 export const BaseObject = {
@@ -70,6 +81,7 @@ export const BaseObject = {
             const noclone = this._noclone || [];
             const take = Object.keys(this).filter(k => !noclone.includes(k));
             let c = { ...R.pick(noclone, this), ...take.reduce((o, k) => {
+                console.log('Object clone', k, this[k]);
                 o[k] = this[k].clone();
                 return o;
             }, {}) };
@@ -90,6 +102,17 @@ export const BaseObject = {
 
         value() {
             return this;
+        },
+
+        eval(env) {
+            let ret = {};
+            for (let [k, v] in Object.entries(this)) {
+                // ['eval', k, v].display();
+                if (this.hasOwnProperty(k)) {
+                    ret[k] = v.eval(env);
+                }
+            }
+            return ret;
         }
     }
 }
@@ -115,6 +138,12 @@ const BaseArray = Class.create({
         },
         format() {
             return `[${this.join(' ')}]`;
+        },
+        eval(env) {
+            // console.log('arr eval', this);
+            const receiver = this[0].eval(env);
+            const message = this[1];
+            return receiver[message](...this.slice(2));
         }
     }
 });
@@ -125,6 +154,9 @@ const BaseString = Class.create({
     methods: {
         clone() {
             return this + '';
+        },
+        eval() {
+            return this;
         }
     }
 });
@@ -138,84 +170,71 @@ export const BaseNumber = Class.create({
         },
         clone() {
             return this;
+        },
+        eval() {
+            return this;
+        },
+        '+'(n) {
+            return this + n;
         }
     }
 });
 extendProto(Number.prototype, BaseNumber);
 
-export const LazyClass = Class.subclass({
-    name: 'LazyClass',
+export const BaseFunction = Class.create({
+    name: 'Function',
     methods: {
-        lambda(fn) {
-            return this.create({
-                fn
-            });
-        }
-    }
-});
-
-export const Lazy = LazyClass.create({
-    vars: {
-        fn: null,
-    },
-    methods: {
-        value() {
-            return this.fn();
-        }
-    }
-});
-
-console.log(Lazy)
-
-export const Interface = Class.create({
-    vars: {
-        super: null,
-        methods: {}, // aka generic functions
-    },
-    methods: {
-
-    }
-});
-
-// typing of a method, args -> ret
-export const MethodDef = Class.create({
-    vars: {
-        args: [],
-        ret: null,
-    }
-});
-
-export const Arg = Class.create({
-    vars: {
-        name: '',
-        type: null,
-    }
-});
-
-export const Expression = Interface.create({
-    super: null,
-    methods: {
-        eval: MethodDef.create({
-            args: [Arg.create({
-                name: 'value',
-                type: Lazy.lambda(??),
-            })],
-            ret: () => Expression,
-        })
-    }
-})
-
-// follow interpreter pattern? build up OO AST?
-export const SendExpression = Class.create({
-    name: 'SendExpression',
-    vars: {
-        receiver: null,
-        message: '',
-        args: [],
-    },
-    methods: {
-        eval(passed) {
-
+        clone() {
+            return this;
+        },
+        eval() {
+            return this;
         }
     }
 })
+extendProto(Function.prototype, BaseFunction);
+
+export function q(sym) {
+    return Reference.create({ sym })
+};
+
+export const Env = [Class, 'create', {
+    name: 'Env',
+    vars: {
+        scope: {},
+        parent: null,
+    },
+    methods: {
+        lookup(name) {
+            if (name in this) {
+                return this[name];
+            } else if (this.parent !== null) {
+                return this.parent.lookup(name);
+            } else {
+                return undefined;
+            }
+        },
+        define(name, value) {
+            this[name] = value;
+            return value;
+        },
+        defclass(obj, meta = Class) {
+            return this.define(obj.name, [meta, 'create', obj].eval());
+        }
+    }
+}].eval();
+
+export const BaseEnv = Env.create();
+BaseEnv.define('Env', Env);
+
+export const Reference = BaseEnv.defclass({
+    name: 'Reference',
+    vars: {
+        sym: 'nil',
+    },
+    methods: {
+        eval(env) {
+            return env.lookup(this.sym);
+        }
+    }
+});
