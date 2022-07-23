@@ -114,6 +114,10 @@ export const BaseObject = {
                 }
             }
             return ret;
+        },
+
+        compile() {
+            return `{${Object.entries(this).map(([k, v]) => `${k}: ${v.compile()}`)}}`;
         }
     }
 }
@@ -176,6 +180,9 @@ const BaseArray = Primitive.create({
             const receiver = this[0].eval(env);
             const message = this[1];
             return receiver[message](...this.slice(2));
+        },
+        compile() {
+            return `${this[0].compile()}.${this[1]}(${this.slice(2).map(a => a.compile()).join(', ')})`;
         }
     }
 }).jack();
@@ -191,6 +198,9 @@ const BaseString = Primitive.create({
         },
         sym() {
             return Sym.create({ sym: this });
+        },
+        compile() {
+            return `'${this}'`;
         },
     }
 }).jack();
@@ -209,7 +219,11 @@ export const BaseNumber = Primitive.create({
         },
         '+'(n) {
             return this + n;
-        }
+        },
+        compile() {
+            return this.toString();
+        },
+
     }
 }).jack();
 
@@ -222,7 +236,10 @@ export const BaseFunction = Primitive.create({
         },
         eval() {
             return this;
-        }
+        },
+        compile() {
+            throw new Error('cannot compile function');
+        },
     }
 }).jack();
 
@@ -274,6 +291,9 @@ export const Sym = BaseEnv.defclass({
         },
         toString() {
             return this.sym;
+        },
+        compile() {
+            return `BaseEnv.${this.sym}`;
         }
     }
 });

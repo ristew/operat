@@ -106,3 +106,13 @@ senty.add(senty.msgCount());
 
 BaseEnv.Number.extend('cube', function() { return this ** 3; });
 (7).cube().display();
+
+BaseEnv.define('senty', senty);
+
+function testCompile(expr) {
+    const code = expr.compile();
+    code.log('compiled code:');
+    return eval(code);
+}
+
+testCompile(['senty'.sym(), 'add', 'compiled?']);
