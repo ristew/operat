@@ -84,7 +84,7 @@ Set.display();
 
 console.log([2, '+', 3].eval());
 BaseEnv.defclass({
-    name: 'Sent',
+    name: 'Sent'.sym(),
     vars: {
         log: [],
     },
@@ -103,3 +103,6 @@ const senty = BaseEnv.Sent.create();
 senty.add('test evald class');
 senty.add('very useful');
 senty.add(senty.msgCount());
+
+BaseEnv.Number.extend('cube', function() { return this ** 3; });
+(7).cube().display();

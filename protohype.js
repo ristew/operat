@@ -36,11 +36,20 @@ export const Class = {
         subclass(props={}) {
             let m = this.class.create(props);
             m.vars = { ...this.vars, ...m.vars };
-            m.methods = { ...this.methods, ...m.methods };
             m.superclass = this;
             m.methods.__proto__ = this.methods;
             return m;
         },
+
+        // add on a method
+        extend(name, fn) {
+            if (!this.methods.hasOwnProperty(name)) {
+                this.methods[name] = fn.bind(this);
+            } else {
+                throw new Error(`Attempt to extend already defined method: ${name}`);
+            }
+        },
+
         format() {
             return `Class ${this.name}{ vars: ${this.vars.properties().format()}, methods: ${this.methods.properties().format()}}`
         },
@@ -51,6 +60,7 @@ export const Class = {
 };
 export const BaseObject = {
     name: 'Object',
+    proto: Object.prototype,
     vars: {},
     methods: {
         dontClone(property) {
@@ -82,6 +92,11 @@ export const BaseObject = {
             console.log(this.format());
         },
 
+        log(msg) {
+            console.log(msg, this);
+            return this;
+        },
+
         properties() {
             return Object.keys(this);
         },
@@ -93,7 +108,7 @@ export const BaseObject = {
         eval(env) {
             let ret = {};
             for (let [k, v] in Object.entries(this)) {
-                // ['eval', k, v].display();
+                [k, v].log('eval');
                 if (this.hasOwnProperty(k)) {
                     ret[k] = v.eval(env);
                 }
@@ -102,28 +117,59 @@ export const BaseObject = {
         }
     }
 }
+metawire(Class);
 // jack in
 export function extendProto(proto, cls) {
     for (let name in cls.methods) {
         proto[name] = cls.methods[name];
     }
 }
+const Primitive = metawire({
+    name: 'Primitive',
+    superclass: Class,
+    vars: {
+        proto: null,
+    },
+    methods: {
+        extend(name, fn) {
+            this.class.superclass.extend.apply(this, [name, fn]);
+            this.proto[name] = fn;
+        },
+        jack() {
+            for (let [k, v] of Object.entries(this.methods)) {
+                if (v !== null && !this.proto.hasOwnProperty(k)) {
+                    this.proto[k] = v;
+                }
+            }
+            return this;
+        }
+    },
+    wrap(obj) {
+        const p = this.create(obj);
+        extendProto(p.proto, p);
+        return p;
+    }
+})
+metawire(BaseObject, Primitive);
+BaseObject.jack();
 export function metawire(o, cls=Class) {
     o.__proto__ = cls.methods;
     o.class = cls;
+    return o;
 }
-extendProto(Object.prototype, BaseObject);
-metawire(Class);
-metawire(BaseObject);
-const BaseArray = Class.create({
+const BaseArray = Primitive.create({
     name: 'Array',
-    vars: {},
+    proto: Array.prototype,
     methods: {
         clone() {
             return this.map(i => i.clone());
         },
         format() {
             return `[${this.join(' ')}]`;
+        },
+        log(msg) {
+            console.log(msg, ...this);
+            return this;
         },
         eval(env) {
             // console.log('arr eval', this);
@@ -132,24 +178,25 @@ const BaseArray = Class.create({
             return receiver[message](...this.slice(2));
         }
     }
-});
-extendProto(Array.prototype, BaseArray);
-const BaseString = Class.create({
+}).jack();
+const BaseString = Primitive.create({
     name: 'String',
-    vars: {},
+    proto: String.prototype,
     methods: {
         clone() {
             return this + '';
         },
         eval() {
             return this;
-        }
+        },
+        sym() {
+            return Sym.create({ sym: this });
+        },
     }
-});
-extendProto(String.prototype, BaseString);
-export const BaseNumber = Class.create({
+}).jack();
+export const BaseNumber = Primitive.create({
     name: 'Number',
-    vars: {},
+    proto: Number.prototype,
     methods: {
         display() {
             console.log(this.toString());
@@ -164,11 +211,11 @@ export const BaseNumber = Class.create({
             return this + n;
         }
     }
-});
-extendProto(Number.prototype, BaseNumber);
+}).jack();
 
-export const BaseFunction = Class.create({
+export const BaseFunction = Primitive.create({
     name: 'Function',
+    proto: Function.prototype,
     methods: {
         clone() {
             return this;
@@ -177,12 +224,7 @@ export const BaseFunction = Class.create({
             return this;
         }
     }
-})
-extendProto(Function.prototype, BaseFunction);
-
-export function q(sym) {
-    return Reference.create({ sym })
-};
+}).jack();
 
 export const Env = [Class, 'create', {
     name: 'Env',
@@ -205,7 +247,7 @@ export const Env = [Class, 'create', {
             return value;
         },
         defclass(obj, meta = Class) {
-            return this.define(obj.name, [meta, 'create', obj].eval());
+            return this.define(obj.name.toString(), [meta, 'create', obj].eval());
         },
         child() {
             return this.class.create({ parent: this });
@@ -215,15 +257,27 @@ export const Env = [Class, 'create', {
 
 export const BaseEnv = Env.create();
 BaseEnv.define('Env', Env);
+BaseEnv.define('Number', BaseNumber);
+BaseEnv.define('Function', BaseFunction);
+BaseEnv.define('String', BaseString);
+BaseEnv.define('Array', BaseArray);
+BaseEnv.define('Object', BaseObject);
 
-export const Reference = BaseEnv.defclass({
-    name: 'Reference',
+export const Sym = BaseEnv.defclass({
+    name: 'Sym',
     vars: {
         sym: 'nil',
     },
     methods: {
         eval(env) {
             return env.lookup(this.sym);
+        },
+        toString() {
+            return this.sym;
         }
     }
 });
+
+export function q(sym) {
+    return Sym.create({ sym })
+};
