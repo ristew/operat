@@ -42,12 +42,17 @@ export const Class = {
         },
 
         // add on a method
-        extend(name, fn) {
+        extendMethod(name, fn) {
             if (!this.methods.hasOwnProperty(name)) {
-                this.methods[name] = fn.bind(this);
+                this.methods[name] = fn;
             } else {
                 throw new Error(`Attempt to extend already defined method: ${name}`);
             }
+        },
+
+        extend(body) {
+            console.log('class extend');
+            Object.entries(body.methods).map(([name, fn]) => this.extendMethod(name, fn));
         },
 
         format() {
@@ -135,9 +140,9 @@ const Primitive = metawire({
         proto: null,
     },
     methods: {
-        extend(name, fn) {
-            this.class.superclass.extend.apply(this, [name, fn]);
-            this.proto[name] = fn;
+        extend(body) {
+            Object.entries(body.methods).map(([name, fn]) => this.extendMethod(name, fn));
+            Object.entries(body.methods).map(([name, fn]) => this.proto[name] = fn );
         },
         jack() {
             for (let [k, v] of Object.entries(this.methods)) {
@@ -159,6 +164,9 @@ BaseObject.jack();
 export function metawire(o, cls=Class) {
     o.__proto__ = cls.methods;
     o.class = cls;
+    if (o.superclass) {
+        o.methods.__proto__ = o.superclass.methods;
+    }
     return o;
 }
 const BaseArray = Primitive.create({
@@ -286,9 +294,6 @@ export const Sym = BaseEnv.defclass({
         sym: 'nil',
     },
     methods: {
-        eval(env) {
-            return env.lookup(this.sym);
-        },
         toString() {
             return this.sym;
         },
@@ -297,6 +302,14 @@ export const Sym = BaseEnv.defclass({
         }
     }
 });
+
+Sym.extend({
+    methods: {
+        eval(env) {
+            return env.lookup(this.sym);
+        },
+    }
+})
 
 export function q(sym) {
     return Sym.create({ sym })
