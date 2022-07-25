@@ -115,8 +115,8 @@ BaseEnv.define('senty', senty);
 
 function testCompile(expr) {
     const code = expr.compile();
-    code.log('compiled code:');
-    return eval(code);
+    code.display('compiled code:');
+    return code.wrap()(BaseEnv);
 }
 
 testCompile(['senty'.sym(), 'add', 'compiled?']);

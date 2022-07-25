@@ -190,7 +190,7 @@ const BaseArray = Primitive.create({
             return receiver[message](...this.slice(2));
         },
         compile() {
-            return `${this[0].compile()}.${this[1]}(${this.slice(2).map(a => a.compile()).join(', ')})`;
+            return JSCode.from(`${this[0].compile()}.${this[1]}(${this.slice(2).map(a => a.compile()).join(', ')})`);
         }
     }
 }).jack();
@@ -208,7 +208,7 @@ const BaseString = Primitive.create({
             return Sym.create({ sym: this });
         },
         compile() {
-            return `'${this}'`;
+            return JSCode.from(`'${this}'`);
         },
     }
 }).jack();
@@ -229,7 +229,7 @@ export const BaseNumber = Primitive.create({
             return this + n;
         },
         compile() {
-            return this.toString();
+            return JSCode.from(this.toString());
         },
 
     }
@@ -288,6 +288,29 @@ BaseEnv.define('String', BaseString);
 BaseEnv.define('Array', BaseArray);
 BaseEnv.define('Object', BaseObject);
 
+export const JSCode = BaseEnv.defclass({
+    name: 'JSCode',
+    vars: {
+        code: '',
+    },
+    methods: {
+        wrap() {
+            return new Function('env', this.code);
+        },
+        format() {
+            let backtick = '`';
+            return `${backtick}${this}${backtick}`;
+        },
+        toString() {
+            return this.code;
+        }
+    },
+    from(code) {
+        return this.create({ code });
+    }
+});
+
+
 export const Sym = BaseEnv.defclass({
     name: 'Sym',
     vars: {
@@ -298,8 +321,8 @@ export const Sym = BaseEnv.defclass({
             return this.sym;
         },
         compile() {
-            return `BaseEnv.${this.sym}`;
-        }
+            return JSCode.from(`env.${this.sym}`);
+        },
     }
 });
 
