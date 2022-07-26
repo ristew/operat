@@ -129,4 +129,4 @@ function testCompile(expr) {
     },
 }].eval(BaseEnv);
 
-[[['CompiledCircle'.$(), 'create', { r: 5 }], 'area'], 'log', 'compiled method:'].eval(BaseEnv);
+[[['Circle'.$(), 'create', { r: 5 }], 'area'], 'log', 'compiled method:'].eval(BaseEnv);

@@ -15,6 +15,10 @@ export const Class = {
     },
     methods: {
         create(props={}) {
+            console.log(this)
+            return this.$create(props.eval(this))
+        },
+        $create(props={}) {
             let inst = props;
             Object.keys(this.vars)
                   .filter(v => !inst.hasOwnProperty(v))
@@ -124,8 +128,8 @@ export const BaseObject = {
 
         eval(env) {
             let ret = {};
+            this.log('eval')
             for (let [k, v] in Object.entries(this)) {
-                [k, v].log('eval');
                 if (this.hasOwnProperty(k)) {
                     ret[k] = v.eval(env);
                 }
@@ -182,7 +186,39 @@ export function metawire(o, cls=Class) {
     }
     return o;
 }
-const BaseArray = Primitive.create({
+
+export const ExecContext = Class.$create({
+    name: 'ExecContext',
+    vars: {
+        env: null,
+        object: null,
+    },
+    methods: {
+        base() {
+            if (typeof this.object === 'object') {
+                return this.object;
+            } else {
+                return {};
+            }
+        },
+        proxy() {
+            let self = this;
+            return new Proxy(this.base(), {
+                get(target, p) {
+                    if (p in target) {
+                        return target[p];
+                    } else if (self.env) {
+                        return self.env.lookup(p);
+                    } else {
+                        return undefined;
+                    }
+                }
+            });
+        }
+    }
+});
+
+const BaseArray = Primitive.$create({
     name: 'Array',
     proto: Array.prototype,
     methods: {
@@ -200,7 +236,9 @@ const BaseArray = Primitive.create({
             // console.log('arr eval', this);
             const receiver = this[0].eval(env);
             const message = this[1];
-            return receiver[message](...this.slice(2));
+            const method = receiver[message];
+            [receiver, message, method].log('eval arr: ');
+            return method.apply(env, [this[0].eval(env), ...this.slice(2).map(a => this.vau() ? a : a.eval(env))]);
         },
         method() {
             return this[1];
@@ -217,7 +255,7 @@ const BaseArray = Primitive.create({
 }).jack();
 
 
-const BaseString = Primitive.create({
+const BaseString = Primitive.$create({
     name: 'String',
     proto: String.prototype,
     methods: {
@@ -232,7 +270,7 @@ const BaseString = Primitive.create({
         },
     }
 }).jack();
-export const BaseNumber = Primitive.create({
+export const BaseNumber = Primitive.$create({
     name: 'Number',
     proto: Number.prototype,
     methods: {
@@ -258,7 +296,7 @@ export const BaseNumber = Primitive.create({
     },
 }).jack();
 
-export const BaseFunction = Primitive.create({
+export const BaseFunction = Primitive.$create({
     name: 'Function',
     proto: Function.prototype,
     methods: {
@@ -274,7 +312,7 @@ export const BaseFunction = Primitive.create({
     }
 }).jack();
 
-export const Env = [Class, 'create', {
+export const Env = Class.$create({
     name: 'Env',
     vars: {
         scope: {},
@@ -295,13 +333,13 @@ export const Env = [Class, 'create', {
             return value;
         },
         defclass(obj, meta = Class) {
-            return this.define(obj.name.toString(), [meta, 'create', obj].eval());
+            return this.define(obj.name.toString(), [meta, 'create', obj].eval(this));
         },
         child(scope = {}) {
             return this.class.create({ parent: this, scope });
         }
     }
-}].eval();
+});
 
 export const BaseEnv = Env.create();
 BaseEnv.define('Env', Env);
@@ -310,30 +348,6 @@ BaseEnv.define('Function', BaseFunction);
 BaseEnv.define('String', BaseString);
 BaseEnv.define('Array', BaseArray);
 BaseEnv.define('Object', BaseObject);
-
-export const ExecContext = BaseEnv.defclass({
-    name: 'ExecContext',
-    vars: {
-        env: null,
-        object: null,
-        passed: null,
-    },
-    methods: {
-        proxy() {
-            return new Proxy(this.object, {
-                get(target, p) {
-                    if (p in target) {
-                        return target[p];
-                    } else if (p in this.passed) {
-                        return this.passed[p];
-                    } else {
-                        return this.env.lookup(p);
-                    }
-                }
-            });
-        }
-    }
-});
 
 export const JSCode = BaseEnv.defclass({
     name: 'JSCode',
@@ -431,13 +445,8 @@ export const Method = BaseEnv.defclass({
             let backtick = '`';
             return `new Function(${this.$args.map(a => a.json()).join(', ')}${backtick}${this.fn.compile()}${backtick})`;
         },
-        apply(env, object, passed) {
-            let ex = ExecContext.create({
-                passed: this.$args.reduce((o, a) => o[a] = a in passed ? passed[a] : a.default, {}),
-                env,
-                object
-            }).proxy();
-            return this.fn.apply(ex);
+        apply(ctx, passed) {
+            return this.fn.apply(ctx, passed);
         }
     },
 })
