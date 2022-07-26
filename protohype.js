@@ -27,7 +27,6 @@ export const Class = {
                   });
             // class.methods is objects proto
             inst.__proto__ = this.methods;
-            inst.dontClone('class');
             inst.class = this;
             return inst;
         },
@@ -61,12 +60,17 @@ export const Class = {
         eval() {
             return this;
         },
+
+        compile() {
+            return `env.${this.name}`;
+        }
     }
 };
 export const BaseObject = {
     name: 'Object',
     proto: Object.prototype,
     vars: {},
+    noclone: ['class'],
     methods: {
         dontClone(property) {
             this._noclone ||= [];
@@ -79,10 +83,10 @@ export const BaseObject = {
             if (typeof this === 'string') {
                 return this + '';
             }
-            const noclone = this._noclone || [];
+            const noclone = [...this.class.noclone || [], 'class'];
             const take = Object.keys(this).filter(k => !noclone.includes(k));
             let c = { ...R.pick(noclone, this), ...take.reduce((o, k) => {
-                // console.log('Object clone', k, this[k]);
+                console.log('Object clone', k, this[k]);
                 o[k] = this[k].clone();
                 return o;
             }, {}) };
@@ -91,6 +95,10 @@ export const BaseObject = {
         },
         format() {
             return this.toString();
+        },
+
+        get class() {
+            return BaseObject;
         },
 
         display() {
@@ -110,6 +118,10 @@ export const BaseObject = {
             return this;
         },
 
+        json() {
+            return JSON.stringify(this);
+        },
+
         eval(env) {
             let ret = {};
             for (let [k, v] in Object.entries(this)) {
@@ -122,7 +134,8 @@ export const BaseObject = {
         },
 
         compile() {
-            return `{${Object.entries(this).map(([k, v]) => `${k}: ${v.compile()}`)}}`;
+            console.log(this);
+            return `{${Object.entries(this).map(([k, v]) => `${k}: ${k.indexOf('$') === 0 ? v.json() : v.compile()}`)}}`;
         }
     }
 }
@@ -189,11 +202,21 @@ const BaseArray = Primitive.create({
             const message = this[1];
             return receiver[message](...this.slice(2));
         },
+        method() {
+            return this[1];
+        },
+        vau() {
+            return this.method().indexOf('$') === 0;
+        },
         compile() {
-            return JSCode.from(`${this[0].compile()}.${this[1]}(${this.slice(2).map(a => a.compile()).join(', ')})`);
+            console.log(this);
+
+            return JSCode.from(`${this[0].compile()}.${this[1]}(env.child()${this.vau() ? this.slice(2).json() : this.slice(2).map(a => a.compile()).join(', ')})`);
         }
     }
 }).jack();
+
+
 const BaseString = Primitive.create({
     name: 'String',
     proto: String.prototype,
@@ -203,9 +226,6 @@ const BaseString = Primitive.create({
         },
         eval() {
             return this;
-        },
-        sym() {
-            return Sym.create({ sym: this });
         },
         compile() {
             return JSCode.from(`'${this}'`);
@@ -232,7 +252,10 @@ export const BaseNumber = Primitive.create({
             return JSCode.from(this.toString());
         },
 
-    }
+    },
+    pi() {
+        return Math.PI;
+    },
 }).jack();
 
 export const BaseFunction = Primitive.create({
@@ -274,8 +297,8 @@ export const Env = [Class, 'create', {
         defclass(obj, meta = Class) {
             return this.define(obj.name.toString(), [meta, 'create', obj].eval());
         },
-        child() {
-            return this.class.create({ parent: this });
+        child(scope = {}) {
+            return this.class.create({ parent: this, scope });
         }
     }
 }].eval();
@@ -287,6 +310,30 @@ BaseEnv.define('Function', BaseFunction);
 BaseEnv.define('String', BaseString);
 BaseEnv.define('Array', BaseArray);
 BaseEnv.define('Object', BaseObject);
+
+export const ExecContext = BaseEnv.defclass({
+    name: 'ExecContext',
+    vars: {
+        env: null,
+        object: null,
+        passed: null,
+    },
+    methods: {
+        proxy() {
+            return new Proxy(this.object, {
+                get(target, p) {
+                    if (p in target) {
+                        return target[p];
+                    } else if (p in this.passed) {
+                        return this.passed[p];
+                    } else {
+                        return this.env.lookup(p);
+                    }
+                }
+            });
+        }
+    }
+});
 
 export const JSCode = BaseEnv.defclass({
     name: 'JSCode',
@@ -326,6 +373,33 @@ export const Sym = BaseEnv.defclass({
     }
 });
 
+export const This = BaseEnv.defclass({
+    name: 'This',
+    methods: {
+        compile() {
+            return 'this';
+        },
+        eval(env) {
+            return this;
+        }
+    }
+});
+export const t = This.create();
+
+export const EnvCall = BaseEnv.defclass({
+    name: 'EnvCall',
+    methods: {
+        compile() {
+            return 'env';
+        },
+        eval(env) {
+            return env;
+        }
+    }
+})
+export const ec = EnvCall.create();
+
+
 Sym.extend({
     methods: {
         eval(env) {
@@ -333,7 +407,39 @@ Sym.extend({
         },
     }
 })
+BaseString.extend({
+    methods: {
+        $() {
+            return Sym.create({ sym: this });
+        },
+    }
+})
 
 export function q(sym) {
     return Sym.create({ sym })
 };
+
+export const Method = BaseEnv.defclass({
+    name: 'Method',
+    vars: {
+        $args: [],
+        ret: null,
+        fn: null,
+    },
+    methods: {
+        compile() {
+            let backtick = '`';
+            return `new Function(${this.$args.map(a => a.json()).join(', ')}${backtick}${this.fn.compile()}${backtick})`;
+        },
+        apply(env, object, passed) {
+            let ex = ExecContext.create({
+                passed: this.$args.reduce((o, a) => o[a] = a in passed ? passed[a] : a.default, {}),
+                env,
+                object
+            }).proxy();
+            return this.fn.apply(ex);
+        }
+    },
+})
+
+export const me = '~'.$();

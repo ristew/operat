@@ -1,4 +1,4 @@
-import { BaseEnv, Class, q } from './protohype.js';
+import { BaseEnv, Class, t, ec } from './protohype.js';
 
 const Point = Class.create({
     vars: {
@@ -84,7 +84,7 @@ Set.display();
 
 console.log([2, '+', 3].eval());
 BaseEnv.defclass({
-    name: 'Sent'.sym(),
+    name: 'Sent',
     vars: {
         log: [],
     },
@@ -119,4 +119,14 @@ function testCompile(expr) {
     return code.wrap()(BaseEnv);
 }
 
-testCompile(['senty'.sym(), 'add', 'compiled?']);
+[ec, 'defclass', {
+    name: 'Circle',
+    vars: {
+        r: 1
+    },
+    methods: {
+        area: ['Method'.$(), 'create', { fn: [['Number'.$(), 'pi'], 'times', [t, 'r', 'squared']] }],
+    },
+}].eval(BaseEnv);
+
+[[['CompiledCircle'.$(), 'create', { r: 5 }], 'area'], 'log', 'compiled method:'].eval(BaseEnv);
