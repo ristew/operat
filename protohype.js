@@ -251,10 +251,9 @@ export const BaseFunction = Primitive.create({
     }
 }).jack();
 
-export const Env = [Class, 'create', {
+export const Env = Class.create({
     name: 'Env',
     vars: {
-        scope: {},
         parent: null,
     },
     methods: {
@@ -278,7 +277,7 @@ export const Env = [Class, 'create', {
             return this.class.create({ parent: this });
         }
     }
-}].eval();
+});
 
 export const BaseEnv = Env.create();
 BaseEnv.define('Env', Env);
@@ -329,7 +328,7 @@ export const Sym = BaseEnv.defclass({
 Sym.extend({
     methods: {
         eval(env) {
-            return env.lookup(this.sym);
+            return env(this.sym);
         },
     }
 })
