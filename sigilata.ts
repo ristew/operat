@@ -22,9 +22,13 @@ class ObjectExpression implements Expression {
     const cls = this._class.eval(ctx);
     const props = {};
     for (let [key, val] of Object.entries(this._map)) {
-
+      if (key[0] === ':') {
+        props[key.slice(1)] = val.eval(ctx);
+      } else {
+        props[key.slice[1]] = val;
+      }
     }
-    return cls.create()
+    return cls.create(props);
   }
 
   constructor(cls, map) {
@@ -33,7 +37,7 @@ class ObjectExpression implements Expression {
   }
 }
 
-class RefExpression {
+class RefExpression implements Expression {
   _type: RefType;
   _name: string;
 
@@ -65,11 +69,12 @@ class VarRefExpression extends RefExpression {
 
 class ArgRefExpression extends RefExpression {
   _type: RefType = 'arg';
-
 }
 
 class CallExpression {
-
+  _receiver: Expression;
+  _message: Expression;
+  args:
 }
 
 class VauExpression {
