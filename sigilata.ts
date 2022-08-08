@@ -37,6 +37,22 @@ class ObjectExpression implements Expression {
   }
 }
 
+class ListExpression implements Expression {
+  _inner: [Expression];
+
+  eval(ctx: Context) {
+    return this._inner.map(e => e.eval(ctx));
+  }
+
+  toJS() {
+    return this._inner;
+  }
+
+  constructor(inner) {
+    this._inner = inner;
+  }
+}
+
 class RefExpression implements Expression {
   _type: RefType;
   _name: string;
@@ -71,12 +87,23 @@ class ArgRefExpression extends RefExpression {
   _type: RefType = 'arg';
 }
 
-class CallExpression {
+class CallExpression implements Expression {
   _receiver: Expression;
   _message: Expression;
-  args:
+  _args: ListExpression;
+
+  eval(ctx: Context) {
+    const recv = this._receiver.eval(ctx);
+    const msg = this._message.eval(ctx);
+    const args = this._args.eval(ctx);
+    return recv[msg](...args);
+  }
 }
 
-class VauExpression {
-
+class VauExpression extends CallExpression {
+  eval(ctx: Context) {
+    const recv = this._receiver.eval(ctx);
+    const msg = this._message.eval(ctx);
+    return recv[msg](...this._args.toJS());
+  }
 }
