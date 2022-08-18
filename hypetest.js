@@ -120,3 +120,5 @@ function testCompile(expr) {
 }
 
 testCompile(['senty'.sym(), 'add', 'compiled?']);
+
+

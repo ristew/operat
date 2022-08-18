@@ -48,7 +48,7 @@ class ListExpression implements Expression {
     return this._inner;
   }
 
-  constructor(inner) {
+  constructor(inner: [Expression]) {
     this._inner = inner;
   }
 }

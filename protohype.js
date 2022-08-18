@@ -162,10 +162,10 @@ const Primitive = metawire({
 metawire(BaseObject, Primitive);
 BaseObject.jack();
 export function metawire(o, cls=Class) {
-    o.__proto__ = cls.methods;
+    Object.setPrototypeOf(o, cls.methods);
     o.class = cls;
     if (o.superclass) {
-        o.methods.__proto__ = o.superclass.methods;
+        Object.setPrototypeOf(o.methods, o.superclass.methods);
     }
     return o;
 }
