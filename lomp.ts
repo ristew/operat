@@ -16,6 +16,11 @@ export class Tokenizer {
       .map(tok => tok.trim())
       .filter(tok => tok.length > 0);
   }
+
+  static tokenize(program: string) {
+    let tt = new Tokenizer({ program });
+    return tt.tokenize();
+  }
 }
 
 export enum SymbolKind {
@@ -62,15 +67,23 @@ export class Parser {
 
   nextForm(): any {
     const head = this.chomp();
+    if (head === null) {
+      return null;
+    }
     const n = +head;
     if (!isNaN(n)) {
       return n;
     } else if (head === '(') {
       let cur = this.peek();
       let form = [];
-      while (this.peek() !== ')') {
+      while (cur !== ')') {
+        if (cur === null) {
+          throw new Error('Unclosed paren');
+        }
         form.push(this.nextForm());
+        cur = this.peek();
       }
+      this.chomp();
       return form;
     } else {
       if (head[0] === '$') {
@@ -79,5 +92,24 @@ export class Parser {
         return Symbol.standard(head);
       }
     }
+  }
+
+  program() {
+    const prog = [Symbol.vau('progn')];
+    while (true) {
+      const form = this.nextForm();
+      if (form === null) {
+        break;
+      } else {
+        prog.push(form);
+      }
+    }
+    return prog;
+  }
+
+  static fromProgram(program: string) {
+    return new Parser({
+      toks: Tokenizer.tokenize(program)
+    })
   }
 }
