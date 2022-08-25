@@ -119,14 +119,4 @@ function testCompile(expr) {
     return code.wrap()(BaseEnv);
 }
 
-[ec, 'defclass', {
-    name: 'Circle',
-    vars: {
-        r: 1
-    },
-    methods: {
-        area: ['Method'.$(), 'create', { fn: [['Number'.$(), 'pi'], 'times', [t, 'r', 'squared']] }],
-    },
-}].eval(BaseEnv);
-
-[[['Circle'.$(), 'create', { r: 5 }], 'area'], 'log', 'compiled method:'].eval(BaseEnv);
+testCompile(['senty'.sym(), 'add', 'compiled?']);

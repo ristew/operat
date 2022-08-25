@@ -179,10 +179,10 @@ const Primitive = metawire({
 metawire(BaseObject, Primitive);
 BaseObject.jack();
 export function metawire(o, cls=Class) {
-    o.__proto__ = cls.methods;
+    Object.setPrototypeOf(o, cls.methods);
     o.class = cls;
     if (o.superclass) {
-        o.methods.__proto__ = o.superclass.methods;
+        Object.setPrototypeOf(o.methods, o.superclass.methods);
     }
     return o;
 }
@@ -312,10 +312,9 @@ export const BaseFunction = Primitive.$create({
     }
 }).jack();
 
-export const Env = Class.$create({
+export const Env = Class.create({
     name: 'Env',
     vars: {
-        scope: {},
         parent: null,
     },
     methods: {
@@ -417,7 +416,7 @@ export const ec = EnvCall.create();
 Sym.extend({
     methods: {
         eval(env) {
-            return env.lookup(this.sym);
+            return env(this.sym);
         },
     }
 })
