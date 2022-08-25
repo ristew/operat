@@ -65,8 +65,19 @@ export class Parser {
     const n = +head;
     if (!isNaN(n)) {
       return n;
-    } else if (['(', '[', '{'].includes(head)) {
-
+    } else if (head === '(') {
+      let cur = this.peek();
+      let form = [];
+      while (this.peek() !== ')') {
+        form.push(this.nextForm());
+      }
+      return form;
+    } else {
+      if (head[0] === '$') {
+        return Symbol.vau(head.slice(1));
+      } else {
+        return Symbol.standard(head);
+      }
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Parser, Tokenizer } from './lomp';
+import { Parser, Symbol, Tokenizer } from './lomp';
 import { equals } from 'ramda';
 
 describe('lexer', () => {
@@ -23,8 +23,8 @@ describe('lexer', () => {
     const toks = tkn.tokenize();
     const parser = new Parser({ toks });
     const s = parser.nextForm();
-    let exp = ['$log', ['+', 2, 3]];
-    console.log(s, exp, equals(exp, s));
+    let exp = [Symbol.vau('log'), [Symbol.standard('+'), 2, 3]];
+    // console.log(s, exp, equals(exp, s));
     expect(s).toEqual(exp);
   })
 })
