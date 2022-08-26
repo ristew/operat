@@ -45,6 +45,10 @@ export class Symbol {
   static vau(name) {
     return new Symbol({ name, kind: SymbolKind.Vau });
   }
+
+  key() {
+    return this.name;
+  }
 }
 
 
@@ -78,9 +82,23 @@ export class Parser {
       let form = [];
       while (cur !== ')') {
         if (cur === null) {
-          throw new Error('Unclosed paren');
+          throw new Error('Unclosed (');
         }
         form.push(this.nextForm());
+        cur = this.peek();
+      }
+      this.chomp();
+      return form;
+    } else if (head === '{') {
+      let cur = this.peek();
+      let form = {};
+      while (cur !== '}') {
+        if (cur === null) {
+          throw new Error('Unclosed {');
+        }
+        let sym = this.nextForm();
+        let val = this.nextForm();
+        form[sym.key()] = val;
         cur = this.peek();
       }
       this.chomp();
