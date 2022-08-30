@@ -5,14 +5,14 @@ describe('parser', () => {
 ($log (+ 2 3))
 `;
   function toks() {
-    return testProg.tokenize();
+    return testProg._tokenize();
   }
 
   test('basic lex', () => {
     let exp = ['(', '$log', '(', '+', '2', '3', ')', ')'];
     // console.log(toks)
     // console.log(exp)
-    expect(testProg.tokenize()).toEqual(exp);
+    expect(testProg._tokenize()).toEqual(exp);
   });
 
 
@@ -25,7 +25,7 @@ describe('parser', () => {
   });
 
   test('broken parse', () => {
-    const parser = new lomp.Parser({ toks: lomp.Tokenizer.tokenize('($log (+ 1 2)') });
+    const parser = new lomp.Parser({ toks: lomp.Tokenizer._tokenize('($log (+ 1 2)') });
     expect(() => {
       const s = parser.nextForm();
       console.log(s);
@@ -65,3 +65,22 @@ describe('parser', () => {
     expect('(+ 2 3)'.parse().seval(lomp.Env.baseEnv())).toBe(5);
   })
 })
+
+const SC = `
+($class delay-queue {
+  inherits ~queue
+  vars {
+    delay (new ~slot-def {
+      type: !number
+      default: 1000
+      doc: "ms amount to wait before pull return"
+    })
+  }
+  methods {
+    pull ($method (
+      (wait .delay)
+      (pull @super)
+    )
+  }
+})
+`

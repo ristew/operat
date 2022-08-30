@@ -5,21 +5,21 @@ export class Tokenizer {
     this.program = program;
   }
 
-  spaceOut(c) {
+  _space_out(c) {
     this.program = this.program.replaceAll(c, ` ${c} `);
     return this;
   }
 
-  tokenize() {
-    '()[]{}:'.split('').forEach(c => this.spaceOut(c));
+  _tokenize() {
+    '()[]{}:'.split('').forEach(c => this._space_out(c));
     return this.program.split(' ')
       .map(tok => tok.trim())
       .filter(tok => tok.length > 0);
   }
 
-  static tokenize(program: string) {
+  static _tokenize(program: string) {
     let tt = new Tokenizer({ program });
-    return tt.tokenize();
+    return tt._tokenize();
   }
 }
 
@@ -38,46 +38,46 @@ export class OpSymbol implements Expr {
     this.kind = kind;
   }
 
-  static standard(name: string) {
+  static _standard(name: string) {
     return new OpSymbol({ name, kind: SymbolKind.Standard });
   }
 
-  static vau(name: string) {
+  static _vau(name: string) {
     return new OpSymbol({ name, kind: SymbolKind.Vau });
   }
 
-  static fromString(val: string) {
+  static _from_string(val: string) {
     if (val[0] === '$') {
-      return OpSymbol.vau(val.slice(1));
+      return OpSymbol._vau(val.slice(1));
     } else {
-      return OpSymbol.standard(val);
+      return OpSymbol._standard(val);
     }
   }
 
-  key() {
+  _key() {
     return this.name;
   }
 
-  seval(env) {}
+  _eval(env) {}
 
-  isVau() {
+  _is_vau() {
     return this.kind === SymbolKind.Vau;
   }
 
-  isStandard() {
+  _is_standard() {
     return this.kind === SymbolKind.Standard;
   }
 }
 
 interface Expr {
-  seval(env: Env);
+  _eval(env: Env);
 }
 
 export class SExp implements Expr {
   op: OpSymbol;
   args: [Expr]
 
-  seval(env: Env) {
+  _eval(env: Env) {
 
   }
 }
@@ -87,7 +87,7 @@ export class SMap extends Object implements Expr {
     super();
   }
 
-  seval(env) {
+  _eval(env) {
     return this;
   }
 }
@@ -99,25 +99,25 @@ export class Parser {
     this.toks = toks;
   }
 
-  peek() {
+  _peek() {
     return this.toks.length > 0 ? this.toks[0] : null;
   }
 
-  chomp() {
-    let tok = this.peek();
+  _chomp() {
+    let tok = this._peek();
     this.toks.splice(0, 1);
     return tok;
   }
 
-  keySep() {
-    let c = this.chomp();
+  _key_sep() {
+    let c = this._chomp();
     if (c !== ':') {
       throw new Error('expected :, found ' + c);
     }
   }
 
-  nextForm(): Expr {
-    const head = this.chomp();
+  _next_form(): Expr {
+    const head = this._chomp();
     if (head === null) {
       return null;
     }
@@ -125,41 +125,41 @@ export class Parser {
     if (!isNaN(n)) {
       return n;
     } else if (head === '(') {
-      let cur = this.peek();
+      let cur = this._peek();
       let form = [];
       while (cur !== ')') {
         if (cur === null) {
           throw new Error('Unclosed (');
         }
-        form.push(this.nextForm());
-        cur = this.peek();
+        form.push(this._next_form());
+        cur = this._peek();
       }
-      this.chomp();
+      this._chomp();
       return form;
     } else if (head === '{') {
-      let cur = this.peek();
+      let cur = this._peek();
       let form = new SMap();
       while (cur !== '}') {
         if (cur === null) {
           throw new Error('Unclosed {');
         }
-        let sym = this.nextForm() as OpSymbol;
-        this.keySep();
-        let val = this.nextForm();
-        form[sym.key()] = val;
-        cur = this.peek();
+        let sym = this._next_form() as OpSymbol;
+        this._key_sep();
+        let val = this._next_form();
+        form[sym._key()] = val;
+        cur = this._peek();
       }
-      this.chomp();
+      this._chomp();
       return form;
     } else {
-      return OpSymbol.fromString(head);
+      return OpSymbol._from_string(head);
     }
   }
 
-  program(): Expr {
-    const prog: [Expr] = [OpSymbol.vau('progn')];
+  _program(): Expr {
+    const prog: [Expr] = [OpSymbol._vau('progn')];
     while (true) {
-      const form = this.nextForm();
+      const form = this._next_form();
       if (form === null) {
         break;
       } else {
@@ -169,53 +169,53 @@ export class Parser {
     return prog;
   }
 
-  static fromProgram(program: string) {
+  static _from_program(program: string) {
     return new Parser({
-      toks: Tokenizer.tokenize(program)
+      toks: Tokenizer._tokenize(program)
     })
   }
 }
 
 declare global {
   export interface String {
-    tokenize();
-    parse(): Expr;
+    _tokenize();
+    _parse(): Expr;
   }
 }
 
-String.prototype.tokenize = function() {
-  return (new Tokenizer({ program: this })).tokenize();
+String.prototype._tokenize = function() {
+  return (new Tokenizer({ program: this }))._tokenize();
 }
 
-String.prototype.parse = function() {
-  return (new Parser({ toks: this.tokenize() })).program();
+String.prototype._parse = function() {
+  return (new Parser({ toks: this.tokenize() }))._program();
 }
 
 declare global {
   export interface Number {
-    seval(env);
+    _eval(env);
   }
 }
 
-Number.prototype.seval = function(env) {
+Number.prototype._eval = function(env) {
   return this;
 }
 
 
 declare global {
   export interface Array<T> {
-    seval(env);
+    _eval(env);
   }
 }
 
-Array.prototype.seval = function(env: Env) {
+Array.prototype._eval = function(env: Env) {
   // sexp reduce
   const op = this[0];
   let args = this.slice(1);
-  if (op.isStandard()) {
-    args = args.map(a => a.eval(env));
+  if (op._is_standard()) {
+    args = args.map(a => a._eval(env));
   }
-  const method = env.lookup(op);
+  const method = env._lookup(op);
 }
 
 export class Role {
@@ -243,16 +243,16 @@ export class Env {
     this.vaus = vaus;
   }
 
-  lookup(sym: OpSymbol, args = []) {
-    if (sym.isStandard()) {
-      let gf = this.genericFunctions[sym.key()];
+  _lookup(sym: OpSymbol, args = []) {
+    if (sym._is_standard()) {
+      let gf = this.genericFunctions[sym._key()];
       // gf.roles.map(role => )
-    } else if (sym.isVau()) {
-      return this.vaus[sym.key()];
+    } else if (sym._is_vau()) {
+      return this.vaus[sym._key()];
     }
   }
 
-  static baseEnv() {
+  static _base_env() {
     return new Env({
       vaus: {
         progn: {}
@@ -261,11 +261,11 @@ export class Env {
   }
 }
 
-function objectify(o, env) {
+function objectify(o, env: Env) {
   return new Proxy(o, {
     get(target, p: string) {
       if (p[0] === '_' || p[0] === '$') {
-        return env.lookup(OpSymbol.fromString(p));
+        return env._lookup(OpSymbol._from_string(p));
       } else {
         return target[p];
       }
