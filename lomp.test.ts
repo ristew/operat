@@ -1,32 +1,31 @@
-import { Parser, Symbol, Tokenizer } from './lomp';
+import * as lomp from './lomp';
 
 describe('parser', () => {
   const testProg = `
 ($log (+ 2 3))
 `;
   function toks() {
-    const tkn = new Tokenizer({ program: testProg });
-    return tkn.tokenize();
+    return testProg.tokenize();
   }
 
   test('basic lex', () => {
     let exp = ['(', '$log', '(', '+', '2', '3', ')', ')'];
     // console.log(toks)
     // console.log(exp)
-    expect(toks()).toEqual(exp);
+    expect(testProg.tokenize()).toEqual(exp);
   });
 
 
   test('basic parse', () => {
-    const parser = new Parser({ toks: toks() });
+    const parser = new lomp.Parser({ toks: toks() });
     const s = parser.nextForm();
-    let exp = [Symbol.vau('log'), [Symbol.standard('+'), 2, 3]];
+    let exp = [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('+'), 2, 3]];
     // console.log(s, exp, equals(exp, s));
     expect(s).toEqual(exp);
   });
 
   test('broken parse', () => {
-    const parser = new Parser({ toks: Tokenizer.tokenize('($log (+ 1 2)') });
+    const parser = new lomp.Parser({ toks: lomp.Tokenizer.tokenize('($log (+ 1 2)') });
     expect(() => {
       const s = parser.nextForm();
       console.log(s);
@@ -34,31 +33,35 @@ describe('parser', () => {
   });
 
   test('basic program', () => {
-    const parser = Parser.fromProgram(`
+    const prog = `
 ($log (+ 2 3))
 ($log (* 4 (+ 7 8)))
-`);
-    expect(parser.program()).toEqual(
+`;
+    expect(prog.parse()).toEqual(
       [
-        Symbol.vau('progn'),
-        [Symbol.vau('log'), [Symbol.standard('+'), 2, 3]],
-        [Symbol.vau('log'), [Symbol.standard('*'), 4, [Symbol.standard('+'), 7, 8]]],
+        lomp.OpSymbol.vau('progn'),
+        [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('+'), 2, 3]],
+        [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('*'), 4, [lomp.OpSymbol.standard('+'), 7, 8]]],
       ],
     );
   });
 
   test('basic map', () => {
-    const parser = Parser.fromProgram(`
-($log { x 5 y (+ 3 4) })
+    const parser = lomp.Parser.fromProgram(`
+($log { x: 5 y: (+ 3 4) })
 `);
     expect(parser.nextForm()).toEqual(
       [
-        Symbol.vau('log'),
+        lomp.OpSymbol.vau('log'),
         {
           x: 5,
-          y: [Symbol.standard('+'), 3, 4]
+          y: [lomp.OpSymbol.standard('+'), 3, 4]
         }
       ],
     );
   });
+
+  test('basic eval', () => {
+    expect('(+ 2 3)'.parse().seval(lomp.Env.baseEnv())).toBe(5);
+  })
 })
