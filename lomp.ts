@@ -1,25 +1,25 @@
 export class Tokenizer {
-  program: string = '';
+  _program: string = '';
 
   constructor({ program }) {
-    this.program = program;
+    this._program = program;
   }
 
-  _space_out(c) {
-    this.program = this.program.replaceAll(c, ` ${c} `);
+  space_out(c) {
+    this._program = this._program.replaceAll(c, ` ${c} `);
     return this;
   }
 
-  _tokenize() {
-    '()[]{}:'.split('').forEach(c => this._space_out(c));
-    return this.program.split(' ')
+  tokenize() {
+    '()[]{}:'.split('').forEach(c => this.space_out(c));
+    return this._program.split(' ')
       .map(tok => tok.trim())
       .filter(tok => tok.length > 0);
   }
 
-  static _tokenize(program: string) {
+  static tokenize(program: string) {
     let tt = new Tokenizer({ program });
-    return tt._tokenize();
+    return tt.tokenize();
   }
 }
 
@@ -30,54 +30,54 @@ export enum SymbolKind {
 }
 
 export class OpSymbol implements Expr {
-  name: string = '';
-  kind: SymbolKind = SymbolKind.Standard;
+  _name: string = '';
+  _kind: SymbolKind = SymbolKind.Standard;
 
   constructor({ name, kind }) {
-    this.name = name;
-    this.kind = kind;
+    this._name = name;
+    this._kind = kind;
   }
 
-  static _standard(name: string) {
+  static standard(name: string) {
     return new OpSymbol({ name, kind: SymbolKind.Standard });
   }
 
-  static _vau(name: string) {
+  static vau(name: string) {
     return new OpSymbol({ name, kind: SymbolKind.Vau });
   }
 
-  static _from_string(val: string) {
+  static from_string(val: string) {
     if (val[0] === '$') {
-      return OpSymbol._vau(val.slice(1));
+      return OpSymbol.vau(val.slice(1));
     } else {
-      return OpSymbol._standard(val);
+      return OpSymbol.standard(val);
     }
   }
 
-  _key() {
-    return this.name;
+  key() {
+    return this._name;
   }
 
-  _eval(env) {}
+  evl(env) {}
 
-  _is_vau() {
-    return this.kind === SymbolKind.Vau;
+  is_vau() {
+    return this._kind === SymbolKind.Vau;
   }
 
-  _is_standard() {
-    return this.kind === SymbolKind.Standard;
+  is_standard() {
+    return this._kind === SymbolKind.Standard;
   }
 }
 
 interface Expr {
-  _eval(env: Env);
+  evl(env: Env);
 }
 
 export class SExp implements Expr {
-  op: OpSymbol;
-  args: [Expr]
+  _op: OpSymbol;
+  _args: [Expr]
 
-  _eval(env: Env) {
+  evl(env: Env) {
 
   }
 }
@@ -87,37 +87,37 @@ export class SMap extends Object implements Expr {
     super();
   }
 
-  _eval(env) {
+  evl(env) {
     return this;
   }
 }
 
 export class Parser {
-  toks: [string];
+  _toks: [string];
 
   constructor({ toks }) {
-    this.toks = toks;
+    this._toks = toks;
   }
 
-  _peek() {
-    return this.toks.length > 0 ? this.toks[0] : null;
+  peek(): string {
+    return this._toks.length > 0 ? this._toks[0] : null;
   }
 
-  _chomp() {
-    let tok = this._peek();
-    this.toks.splice(0, 1);
+  chomp() {
+    let tok = this.peek();
+    this._toks.splice(0, 1);
     return tok;
   }
 
-  _key_sep() {
-    let c = this._chomp();
+  key_sep() {
+    let c = this.chomp();
     if (c !== ':') {
       throw new Error('expected :, found ' + c);
     }
   }
 
-  _next_form(): Expr {
-    const head = this._chomp();
+  next_form(): Expr {
+    const head = this.chomp();
     if (head === null) {
       return null;
     }
@@ -125,41 +125,41 @@ export class Parser {
     if (!isNaN(n)) {
       return n;
     } else if (head === '(') {
-      let cur = this._peek();
+      let cur = this.peek();
       let form = [];
       while (cur !== ')') {
         if (cur === null) {
           throw new Error('Unclosed (');
         }
-        form.push(this._next_form());
-        cur = this._peek();
+        form.push(this.next_form());
+        cur = this.peek();
       }
-      this._chomp();
+      this.chomp();
       return form;
     } else if (head === '{') {
-      let cur = this._peek();
+      let cur = this.peek();
       let form = new SMap();
       while (cur !== '}') {
         if (cur === null) {
           throw new Error('Unclosed {');
         }
-        let sym = this._next_form() as OpSymbol;
-        this._key_sep();
-        let val = this._next_form();
-        form[sym._key()] = val;
-        cur = this._peek();
+        let sym = this.next_form() as OpSymbol;
+        this.key_sep();
+        let val = this.next_form();
+        form[sym.key()] = val;
+        cur = this.peek();
       }
-      this._chomp();
+      this.chomp();
       return form;
     } else {
-      return OpSymbol._from_string(head);
+      return OpSymbol.from_string(head);
     }
   }
 
-  _program(): Expr {
-    const prog: [Expr] = [OpSymbol._vau('progn')];
+  program(): Expr {
+    const prog: [Expr] = [OpSymbol.vau('progn')];
     while (true) {
-      const form = this._next_form();
+      const form = this.next_form();
       if (form === null) {
         break;
       } else {
@@ -171,88 +171,75 @@ export class Parser {
 
   static _from_program(program: string) {
     return new Parser({
-      toks: Tokenizer._tokenize(program)
+      toks: Tokenizer.tokenize(program)
     })
   }
 }
 
 declare global {
   export interface String {
-    _tokenize();
-    _parse(): Expr;
+    tokenize();
+    parse(): Expr;
   }
 }
 
-String.prototype._tokenize = function() {
-  return (new Tokenizer({ program: this }))._tokenize();
+String.prototype.tokenize = function() {
+  return (new Tokenizer({ program: this })).tokenize();
 }
 
-String.prototype._parse = function() {
-  return (new Parser({ toks: this.tokenize() }))._program();
+String.prototype.parse = function() {
+  return (new Parser({ toks: this.tokenize() })).program();
 }
 
 declare global {
   export interface Number {
-    _eval(env);
+    evl(env);
   }
 }
 
-Number.prototype._eval = function(env) {
+Number.prototype.evl = function(env) {
   return this;
 }
 
 
 declare global {
   export interface Array<T> {
-    _eval(env);
+    evl(env);
   }
 }
 
-Array.prototype._eval = function(env: Env) {
+Array.prototype.evl = function(env: Env) {
   // sexp reduce
   const op = this[0];
   let args = this.slice(1);
-  if (op._is_standard()) {
+  if (op.is_standard()) {
     args = args.map(a => a._eval(env));
   }
-  const method = env._lookup(op);
+  const method = env.lookup(op);
 }
 
 export class Role {
 
 }
 
-export class GenericFunction {
-  roles: [Role];
-  methods: {};
-
-  getRoles() {
-
-  }
-  lookup(args) {
-    // find most specific method
-    //
-  }
-}
-
 export class Env {
-  genericFunctions: {};
-  vaus: {};
+  _generic_functions: {};
+  _vaus: {};
   constructor({ genericFunctions = {}, vaus = {} } = {}) {
-    this.genericFunctions = genericFunctions;
-    this.vaus = vaus;
+    this._generic_functions = genericFunctions;
+    this._vaus = vaus;
   }
 
-  _lookup(sym: OpSymbol, args = []) {
-    if (sym._is_standard()) {
-      let gf = this.genericFunctions[sym._key()];
+  lookup(sym: OpSymbol, args = []) {
+    if (sym.is_standard()) {
+      let gf = this._generic_functions[sym.key()];
       // gf.roles.map(role => )
-    } else if (sym._is_vau()) {
-      return this.vaus[sym._key()];
+    } else if (sym.is_vau()) {
+      return this._vaus[sym.key()];
     }
   }
 
-  static _base_env() {
+  static base_env() {
     return new Env({
       vaus: {
         progn: {}
@@ -265,7 +252,7 @@ function objectify(o, env: Env) {
   return new Proxy(o, {
     get(target, p: string) {
       if (p[0] === '_' || p[0] === '$') {
-        return env._lookup(OpSymbol._from_string(p));
+        return env.lookup(OpSymbol.from_string(p));
       } else {
         return target[p];
       }

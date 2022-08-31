@@ -5,29 +5,29 @@ describe('parser', () => {
 ($log (+ 2 3))
 `;
   function toks() {
-    return testProg._tokenize();
+    return testProg.tokenize();
   }
 
   test('basic lex', () => {
     let exp = ['(', '$log', '(', '+', '2', '3', ')', ')'];
     // console.log(toks)
     // console.log(exp)
-    expect(testProg._tokenize()).toEqual(exp);
+    expect(testProg.tokenize()).toEqual(exp);
   });
 
 
   test('basic parse', () => {
     const parser = new lomp.Parser({ toks: toks() });
-    const s = parser.nextForm();
+    const s = parser.next_form();
     let exp = [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('+'), 2, 3]];
     // console.log(s, exp, equals(exp, s));
     expect(s).toEqual(exp);
   });
 
   test('broken parse', () => {
-    const parser = new lomp.Parser({ toks: lomp.Tokenizer._tokenize('($log (+ 1 2)') });
+    const parser = new lomp.Parser({ toks: lomp.Tokenizer.tokenize('($log (+ 1 2)') });
     expect(() => {
-      const s = parser.nextForm();
+      const s = parser.next_form();
       console.log(s);
     }).toThrow();
   });
@@ -47,10 +47,10 @@ describe('parser', () => {
   });
 
   test('basic map', () => {
-    const parser = lomp.Parser.fromProgram(`
+    const parser = lomp.Parser._from_program(`
 ($log { x: 5 y: (+ 3 4) })
 `);
-    expect(parser.nextForm()).toEqual(
+    expect(parser.next_form()).toEqual(
       [
         lomp.OpSymbol.vau('log'),
         {
@@ -62,7 +62,7 @@ describe('parser', () => {
   });
 
   test('basic eval', () => {
-    expect('(+ 2 3)'.parse().seval(lomp.Env.baseEnv())).toBe(5);
+    expect('(+ 2 3)'.parse().evl(lomp.Env.base_env())).toBe(5);
   })
 })
 
