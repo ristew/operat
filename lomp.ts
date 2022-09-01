@@ -67,27 +67,60 @@ export class OpSymbol implements Expr {
   is_standard() {
     return this._kind === SymbolKind.Standard;
   }
+
+  json() {
+    return this.key();
+  }
 }
 
 interface Expr {
   evl(env: Env);
+  json();
 }
 
 export class SExp implements Expr {
   _op: OpSymbol;
-  _args: [Expr]
+  _args: Expr[];
 
+  constructor(base: Expr[]) {
+    if (!(base[0] instanceof OpSymbol)) {
+      throw new Error('invalid car ' + base[0]);
+    }
+    this._op = base[0] as OpSymbol;
+    this._args = base.slice(1);
+  }
+
+  // combiner
   evl(env: Env) {
+    // sexp reduce
+    let receiver = this._args[0].evl(env);
+    let passed = this._args.slice(1).map(a => this._op.is_standard() ? a.evl(env) : a);
+    // receiver._env = env;
+    const key = this._op.key();
+    if (!(key in Object.getPrototypeOf(receiver))) {
+      throw new Error(`invalid method ${key} on receiver ${objectName(receiver)}`)
+    }
+    return receiver[this._op.key()](...passed);
+  }
 
+  json() {
+    return [this._op, ...this._args];
   }
 }
 
 export class SMap extends Object implements Expr {
-  constructor() {
+  constructor(map = {}) {
     super();
+    for (let [key, val] of Object.entries(map)) {
+      this[key] = val;
+    }
   }
 
   evl(env) {
+    return this;
+  }
+
+  json() {
     return this;
   }
 }
@@ -126,7 +159,7 @@ export class Parser {
       return n;
     } else if (head === '(') {
       let cur = this.peek();
-      let form = [];
+      let form: Expr[] = [];
       while (cur !== ')') {
         if (cur === null) {
           throw new Error('Unclosed (');
@@ -135,7 +168,7 @@ export class Parser {
         cur = this.peek();
       }
       this.chomp();
-      return form;
+      return new SExp(form);
     } else if (head === '{') {
       let cur = this.peek();
       let form = new SMap();
@@ -157,7 +190,7 @@ export class Parser {
   }
 
   program(): Expr {
-    const prog: [Expr] = [OpSymbol.vau('progn')];
+    const prog: Expr[] = [OpSymbol.vau('progn')];
     while (true) {
       const form = this.next_form();
       if (form === null) {
@@ -166,13 +199,25 @@ export class Parser {
         prog.push(form);
       }
     }
-    return prog;
+    if (prog.length === 2) {
+      return prog[1];
+    } else {
+      return new SExp(prog);
+    }
   }
 
   static _from_program(program: string) {
     return new Parser({
       toks: Tokenizer.tokenize(program)
     })
+  }
+}
+
+function objectName(o) {
+  if ('name' in Object.getPrototypeOf(o)) {
+    return o.name();
+  } else {
+    return 'anon';
   }
 }
 
@@ -193,12 +238,42 @@ String.prototype.parse = function() {
 
 declare global {
   export interface Number {
+    name();
     evl(env);
+    json();
+    '+'(n);
+    '-'(n);
+    '*'(n);
+    '/'(n);
   }
+}
+
+Number.prototype.name = function() {
+  return `number/${this}`;
 }
 
 Number.prototype.evl = function(env) {
   return this;
+}
+
+Number.prototype.json = function() {
+  return this;
+}
+
+Number.prototype['+'] = function(n) {
+  return this + n;
+}
+
+Number.prototype['-'] = function(n) {
+  return this - n;
+}
+
+Number.prototype['*'] = function(n) {
+  return this * n;
+}
+
+Number.prototype['/'] = function(n) {
+  return this / n;
 }
 
 
@@ -209,13 +284,6 @@ declare global {
 }
 
 Array.prototype.evl = function(env: Env) {
-  // sexp reduce
-  const op = this[0];
-  let args = this.slice(1);
-  if (op.is_standard()) {
-    args = args.map(a => a._eval(env));
-  }
-  const method = env.lookup(op);
 }
 
 export class Role {

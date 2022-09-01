@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "jest",
-    "watch": "jest --watch"
+    "watch": "jest --testTimeout 1000 --watch"
   },
   "author": "",
   "license": "ISC",

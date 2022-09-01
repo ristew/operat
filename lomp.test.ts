@@ -19,7 +19,7 @@ describe('parser', () => {
   test('basic parse', () => {
     const parser = new lomp.Parser({ toks: toks() });
     const s = parser.next_form();
-    let exp = [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('+'), 2, 3]];
+    let exp = new lomp.SExp([lomp.OpSymbol.vau('log'), new lomp.SExp([lomp.OpSymbol.standard('+'), 2, 3])]);
     // console.log(s, exp, equals(exp, s));
     expect(s).toEqual(exp);
   });
@@ -38,11 +38,11 @@ describe('parser', () => {
 ($log (* 4 (+ 7 8)))
 `;
     expect(prog.parse()).toEqual(
-      [
+      new lomp.SExp([
         lomp.OpSymbol.vau('progn'),
-        [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('+'), 2, 3]],
-        [lomp.OpSymbol.vau('log'), [lomp.OpSymbol.standard('*'), 4, [lomp.OpSymbol.standard('+'), 7, 8]]],
-      ],
+        new lomp.SExp([lomp.OpSymbol.vau('log'), new lomp.SExp([lomp.OpSymbol.standard('+'), 2, 3])]),
+        new lomp.SExp([lomp.OpSymbol.vau('log'), new lomp.SExp([lomp.OpSymbol.standard('*'), 4, new lomp.SExp([lomp.OpSymbol.standard('+'), 7, 8])])]),
+      ]),
     );
   });
 
@@ -51,18 +51,22 @@ describe('parser', () => {
 ($log { x: 5 y: (+ 3 4) })
 `);
     expect(parser.next_form()).toEqual(
-      [
+      new lomp.SExp([
         lomp.OpSymbol.vau('log'),
-        {
+        new lomp.SMap({
           x: 5,
-          y: [lomp.OpSymbol.standard('+'), 3, 4]
-        }
-      ],
+          y: new lomp.SExp([lomp.OpSymbol.standard('+'), 3, 4])
+        })
+      ]),
     );
   });
 
   test('basic eval', () => {
     expect('(+ 2 3)'.parse().evl(lomp.Env.base_env())).toBe(5);
+  });
+
+  test('deeper math', () => {
+    expect('(* 7 (+ (/ 12 4) 3))'.parse().evl(lomp.Env.base_env())).toBe(42);
   })
 })
 
