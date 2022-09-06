@@ -61,30 +61,42 @@ describe('parser', () => {
     );
   });
 
+});
+
+describe('expressions', () => {
   test('basic eval', () => {
     expect('(+ 2 3)'.parse().evl(lomp.Env.base_env())).toBe(5);
   });
 
   test('deeper math', () => {
     expect('(* 7 (+ (/ 12 4) 3))'.parse().evl(lomp.Env.base_env())).toBe(42);
+  });
+
+  test('basic conditional', () => {
+    expect('($if (= (* 3 4) 12) 42 -1)'.parse().evl(lomp.Env.base_env())).toBe(42);
+  });
+
+  test('basic conditional false', () => {
+    expect('($if (> (* 9 9) 99) 1 2)'.parse().evl(lomp.Env.base_env())).toBe(2);
   })
 })
 
 const SC = `
-($class delay-queue {
-  inherits ~queue
-  vars {
-    delay (new ~slot-def {
+(new ~class {
+  name: delay-queue
+  inherits: ~queue
+  vars: {
+    delay: (new ~slot-def {
       type: !number
       default: 1000
       doc: "ms amount to wait before pull return"
     })
   }
-  methods {
-    pull ($method (
+  methods: {
+    pull: ($method (
       (wait .delay)
       (pull @super)
-    )
+    ))
   }
 })
 `

@@ -58,7 +58,7 @@ export class OpSymbol implements Expr {
     return this._name;
   }
 
-  evl(env) {}
+  evl(env) { return this; }
 
   is_vau() {
     return this._kind === SymbolKind.Vau;
@@ -241,10 +241,12 @@ declare global {
     name();
     evl(env);
     json();
-    '+'(n);
-    '-'(n);
-    '*'(n);
-    '/'(n);
+    '+'(n: number): number;
+    '-'(n: number): number;
+    '*'(n: number): number;
+    '/'(n: number): number;
+    '='(n: number): boolean;
+    '>'(n: number): boolean;
   }
 }
 
@@ -276,6 +278,17 @@ Number.prototype['/'] = function(n) {
   return this / n;
 }
 
+Number.prototype['='] = function(n) {
+  return this === n;
+}
+
+Number.prototype['>'] = function(n) {
+  return this > n;
+}
+
+
+
+
 
 declare global {
   export interface Array<T> {
@@ -284,6 +297,22 @@ declare global {
 }
 
 Array.prototype.evl = function(env: Env) {
+}
+
+declare global {
+  export interface Boolean {
+    evl(env);
+    name(): string;
+    'if'(then, elss);
+  }
+}
+
+Boolean.prototype.name = function() {
+  return this.toString();
+}
+
+Boolean.prototype['if'] = function(then, elss) {
+  return this ? then.evl() : elss.evl();
 }
 
 export class Role {
@@ -326,4 +355,8 @@ function objectify(o, env: Env) {
       }
     }
   })
+}
+
+
+export class SClass {
 }
