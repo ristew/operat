@@ -9,7 +9,7 @@ describe('parser', () => {
   }
 
   test('basic lex', () => {
-    let exp = ['(', '$log', '(', '+', '2', '3', ')', ')'];
+    let exp = ['(', lomp.OpSymbol.from_string('$log'), '(', lomp.OpSymbol.from_string('+'), 2, 3, ')', ')'];
     // console.log(toks)
     // console.log(exp)
     expect(testProg.tokenize()).toEqual(exp);
@@ -61,6 +61,14 @@ describe('parser', () => {
     );
   });
 
+  test('basic string', () => {
+    expect('($log "test string")'.parse()).toEqual(
+      new lomp.SExp([
+        lomp.OpSymbol.vau('log'),
+        "test string",
+      ])
+    )
+  });
 });
 
 describe('expressions', () => {

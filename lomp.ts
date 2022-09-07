@@ -11,10 +11,42 @@ export class Tokenizer {
   }
 
   tokenize() {
-    '()[]{}:'.split('').forEach(c => this.space_out(c));
-    return this._program.split(' ')
-      .map(tok => tok.trim())
-      .filter(tok => tok.length > 0);
+    let toks = [];
+    for (let i = 0; i < this._program.length; i++) {
+      let c = this._program[i];
+      if ('(){}[]:'.includes(c)) {
+        toks.push(c);
+      } else if (c === ';') {
+        while (this._program[i] !== '\n') {
+          i++;
+        }
+      } else if (' \n\t'.includes(c)) {
+      } else if (c === '"') {
+        let str = '';
+        i++;
+        while (this._program[i] !== '"') {
+          str += this._program[i];
+          i++;
+        }
+        toks.push(str);
+      } else {
+        let sym = '';
+        while (this._program[i] && /[^ \n\t()\{\}\[\]\:;"]/.test(this._program[i])) {
+          sym += this._program[i];
+          i++;
+        }
+        i--;
+        let float = Number.parseFloat(sym);
+        if (!isNaN(float)) {
+          toks.push(float);
+        } else if (sym === 'true' || sym === 'false') {
+          toks.push(JSON.parse(sym))
+        } else {
+          toks.push(OpSymbol.from_string(sym));
+        }
+      }
+    }
+    return toks;
   }
 
   static tokenize(program: string) {
@@ -185,7 +217,7 @@ export class Parser {
       this.chomp();
       return form;
     } else {
-      return OpSymbol.from_string(head);
+      return head;
     }
   }
 
@@ -225,6 +257,8 @@ declare global {
   export interface String {
     tokenize();
     parse(): Expr;
+    evl(env);
+    json();
   }
 }
 
@@ -234,6 +268,14 @@ String.prototype.tokenize = function() {
 
 String.prototype.parse = function() {
   return (new Parser({ toks: this.tokenize() })).program();
+}
+
+String.prototype.evl = function(env) {
+  return this;
+}
+
+String.prototype.json = function() {
+  return JSON.stringify(this);
 }
 
 declare global {
