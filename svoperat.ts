@@ -9,29 +9,24 @@ enum OpSymKind {
 let symPool = {};
 let symCtr = 1;
 
-class OpSym {
-  _gen_id: number;
-  _kind: OpSymKind;
-  constructor({ gen_id, kind }) {
 
-    this._gen_id = gen_id;
-    this._kind = kind;
+export class OpSym {
+  _gen_id: number;
+
+  constructor(name: string) {
+    if (symPool[name]) {
+      this._gen_id = symPool[name];
+    } else {
+      let genId = symCtr++;
+      // idk map both ways? fuck it
+      symPool[genId] = name;
+      symPool[name] = genId;
+      this._gen_id = genId;
+    }
   }
 
   toString() {
     return symPool[this._gen_id];
-  }
-
-  static sym(name: string, kind = OpSymKind.Standard) {
-    let genId = symCtr++;
-    // idk map both ways? fuck it
-    symPool[genId] = name;
-    symPool[name] = genId;
-    return new OpSym({ gen_id: genId, kind });
-  }
-
-  static iface(name: string) {
-    return OpSym.sym(name, OpSymKind.Interface);
   }
 }
 
@@ -44,3 +39,73 @@ function baseExtend(proto, methods) {
 baseExtend(Number, {
   eq(n) { return this === n },
 });
+
+export class Lexer {
+  _text: string;
+  _pos: number;
+
+  constructor(text) {
+    this._text = text;
+    this._pos = 0;
+  }
+
+  char() {
+    return this._text[this._pos];
+  }
+
+  nc() {
+    this._pos++;
+  }
+
+  uc() {
+    this._pos--;
+  }
+
+  nextTok() {
+    let c = this.char();
+    this.nc();
+    if ('()[]{}:.'.includes(c)) {
+      return c;
+    }
+    if (' \n\t'.includes(c)) {
+      return null;
+    }
+    if (c === '"') {
+      let str = '';
+      while (this.char() !== '"') {
+        str += this.char();
+        this.nc();
+      }
+      // last "
+      this.nc();
+      return str;
+    }
+    let sym = '';
+
+    while (c && /[^ \n\t()\{\}\[\]\:;\."]/.test(c)) {
+      sym += c;
+      c = this.char();
+      this.nc();
+    }
+    this.uc();
+    if (sym.length === 0) {
+      return null;
+    }
+    let float = Number.parseFloat(sym);
+    if (!isNaN(float)) {
+      return float;
+    } else if (sym === 'true' || sym === 'false') {
+      return JSON.parse(sym);
+    } else {
+      return new OpSym(sym);
+    }
+  }
+
+  tokenize() {
+    let toks = [];
+    while (this.char()) {
+      toks.push(this.nextTok());
+    }
+    return toks.filter(tok => tok !== null);
+  }
+}
