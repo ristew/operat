@@ -56,9 +56,9 @@ export class Tokenizer {
 }
 
 export enum SymbolKind {
-  Standard,
-  Vau,
-
+  Class,
+  Interface,
+  Arg,
 }
 
 export class OpSymbol implements Expr {
@@ -110,23 +110,30 @@ interface Expr {
   json();
 }
 
-export class SExp implements Expr {
-  _op: OpSymbol;
-  _args: Expr[];
+interface It<Inner> {
+  it: Inner;
+}
 
-  constructor(base: Expr[]) {
-    if (!(base[0] instanceof OpSymbol)) {
-      throw new Error('invalid car ' + base[0]);
-    }
-    this._op = base[0] as OpSymbol;
-    this._args = base.slice(1);
+export class SExp implements Expr {
+  _receiver: Expr;
+  _op: OpSymbol;
+  _args: SMap;
+
+  constructor({ receiver, op, args }) {
+    this._receiver = receiver;
+    this._op = op;
+    this._args = args;
   }
 
   // combiner
-  evl(env: Env) {
+  evl(ctx: It<Env>) {
+    let env = ctx.it;
     // sexp reduce
-    let receiver = this._args[0].evl(env);
-    let passed = this._args.slice(1).map(a => this._op.is_standard() ? a.evl(env) : a);
+    let receiver = this._receiver.evl(env);
+    let passed = this._args.clone();
+    for (let [key, val] of Object.entries(passed)) {
+      passed[key] = val.evl(ctx);
+    }
     // receiver._env = env;
     const key = this._op.key();
     if (!(key in Object.getPrototypeOf(receiver))) {
