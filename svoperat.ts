@@ -67,8 +67,8 @@ export class Lexer {
     if ('()[]{}:.!@~$%'.includes(c)) {
       return c;
     }
-    if (' \n\t'.includes(c)) {
-      return null;
+    if (' \n\t'.includes(c)) { // idk different for whitespace?
+      return c;
     }
     if (c === '"') {
       let str = '';
@@ -118,8 +118,15 @@ export class Parser {
     this._pos = 0;
   }
 
-  expr() {
+  tok() {
+    return this._toks[this._pos];
+  }
 
+  expr() {
+    let t = this.tok();
+    case (t) {
+
+    }
   }
 }
 
