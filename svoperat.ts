@@ -64,7 +64,7 @@ export class Lexer {
   nextTok() {
     let c = this.char();
     this.nc();
-    if ('()[]{}:.'.includes(c)) {
+    if ('()[]{}:.!@~$%'.includes(c)) {
       return c;
     }
     if (' \n\t'.includes(c)) {
@@ -107,5 +107,34 @@ export class Lexer {
       toks.push(this.nextTok());
     }
     return toks.filter(tok => tok !== null);
+  }
+}
+
+export class Parser {
+  _toks: any[];
+  _pos: number;
+  constructor(text) {
+    this._toks = (new Lexer(text)).tokenize();
+    this._pos = 0;
+  }
+
+  expr() {
+
+  }
+}
+
+export interface Expression {
+
+}
+
+export class SendExpression {
+  _receiver: Expression;
+  _message: OpSym;
+  _arg: any;
+
+  constructor({ receiver, message, arg }) {
+    this._receiver = receiver;
+    this._message = message;
+    this._arg = arg;
   }
 }
