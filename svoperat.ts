@@ -124,9 +124,6 @@ export class Parser {
 
   expr() {
     let t = this.tok();
-    case (t) {
-
-    }
   }
 }
 
