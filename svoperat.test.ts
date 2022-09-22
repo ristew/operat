@@ -1,4 +1,4 @@
-import { Lexer, OpSym, Parser, SendExpression } from './svoperat';
+import { Arg, ClassRef, Lexer, OpSym, Parser, SendExpression } from './svoperat';
 
 describe('parser', () => {
   test('gensym', () => {
@@ -27,8 +27,6 @@ describe('parser', () => {
     let expr = parser.expr();
     expect(expr).toEqual(new SendExpression({ receiver: 2, message: new OpSym('+'), arg: 3 })); // [2, '.', new OpSym('+'), '(', 3, ')']);
   })
-  test('parse map message', () => {
-  })
   test('parse variables', () => {
   })
   test('parse chained messages', () => {
@@ -41,4 +39,30 @@ describe('parser', () => {
   })
   test('', () => {
   })
+
+  test('string', () => {
+    expect('"hello world"'.parse()).toEqual('hello world')
+  })
+  test('number', () => {
+    expect('4.2'.parse()).toEqual(4.2)
+  })
+  test('symbol', () => {
+    expect('to-string'.parse()).toEqual(new OpSym('to-string'))
+  })
+  test('arg', () => {
+    expect('@'.parse()).toEqual(Arg)
+  })
+  test('class', () => {
+    expect('~http-request').toEqual(new ClassRef(new OpSym('http-request')))
+  })
+  test('interface', () => {})
+  test('boolean', () => {})
+  test('message', () => {})
+  test('map', () => {})
+  test('value', () => {})
+  test('list', () => {})
+  test('', () => {})
+  test('', () => {})
+  test('', () => {})
+  test('', () => {})
 })

@@ -9,6 +9,10 @@ enum OpSymKind {
 let symPool = {};
 let symCtr = 1;
 
+export const Arg = {
+  name: 'arg',
+}
+
 
 export class OpSym {
   _gen_id: number;
@@ -140,5 +144,23 @@ export class SendExpression {
     this._receiver = receiver;
     this._message = message;
     this._arg = arg;
+  }
+}
+
+declare global {
+  export interface String {
+    parse();
+  }
+}
+
+String.prototype.parse = function() {
+
+}
+
+export class ClassRef {
+  _sym: OpSym;
+
+  constructor(sym) {
+    this._sym = sym;
   }
 }
