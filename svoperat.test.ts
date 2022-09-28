@@ -66,3 +66,22 @@ describe('parser', () => {
   test('', () => {})
   test('', () => {})
 })
+
+
+/*
+4.2
+"hello world"
+#true
+symbol
+:message("value")
+:message{:field(2)}
+:message[1 2 3]
+:nested{:map{:key(5)}}
+:nested[:map{:key(1)}, :list[2 3]]
+!type
+~class
+:set{:arg(!self)}
+2:sqrt
+:point:set{:x(5:sqrt) :y(7:sqrt)}
+$do(@:transpose(:x:sqrt))
+ */
