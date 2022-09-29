@@ -87,12 +87,10 @@
 (log (jsrun "let n = 1; for (let i = 0; i < 10; i++) { n = (n + i) * 2; } return n"))
 ;; (jsrun "console.log(this)")
 
-($function condtest (n)
+(log (map (list 30 12 7 25) ($lambda (n)
   ($cond
     ((lt n 10) "small")
     ((lt n 25) "med")
     ((eq n 25) "cusp")
     ((gt n 25) "big")
-    ))
-
-(log (map (list 30 12 7 25) condtest))
+    ))))
