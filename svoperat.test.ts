@@ -11,9 +11,9 @@ describe('parser', () => {
     expect(lex.tokenize()).toEqual(['2', ':', '+', '(', '3', ')']);
   })
   test('tokenize map message', () => {
-    const code = ':shift{ :by(5) :direction(left) }'
+    const code = ':shift{ :by(5), :direction(left) }'
     let lex = new Lexer(code);
-    expect(lex.tokenize()).toEqual(['shift', '{', ':', 'by', '5', ':', 'direction', 'left', '}']);
+    expect(lex.tokenize()).toEqual([':', 'shift', '{', ':', 'by', '(', '5', ')', ',', ':', 'direction', '(', 'left', ')', '}']);
   })
   test('tokenize variables', () => {
     const code = '~test:new{:gt(@)}'

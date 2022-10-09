@@ -6,7 +6,7 @@ enum OpSymKind {
   Message = 5,
 }
 
-let symPool = {};
+let symPool: any = {};
 let symCtr = 1;
 
 export const Arg = {
