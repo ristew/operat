@@ -68,7 +68,7 @@ export class Lexer {
   nextTok() {
     let c = this.char();
     this.nc();
-    if ('()[]{}:.!@~$%'.includes(c)) {
+    if ('()[]{}:!@~$'.includes(c)) {
       return c;
     }
     if (' \n\t'.includes(c)) { // idk different for whitespace?
@@ -86,22 +86,16 @@ export class Lexer {
     }
     let sym = '';
 
-    while (c && /[^ \n\t()\{\}\[\]\:;\."]/.test(c)) {
+    while (c && /[^ \n\t()\{\}\[\]\:;"]/.test(c)) {
       sym += c;
       c = this.char();
       this.nc();
     }
     this.uc();
     if (sym.length === 0) {
-      return null;
-    }
-    let float = Number.parseFloat(sym);
-    if (!isNaN(float)) {
-      return float;
-    } else if (sym === 'true' || sym === 'false') {
-      return JSON.parse(sym);
+      return this.nextTok();
     } else {
-      return new OpSym(sym);
+      return sym;
     }
   }
 
@@ -129,6 +123,16 @@ export class Parser {
   expr() {
     let t = this.tok();
   }
+
+  message() {
+
+  }
+
+  list() {
+
+  }
+
+
 }
 
 export interface Expression {
@@ -140,7 +144,7 @@ export class SendExpression {
   _message: OpSym;
   _arg: any;
 
-  constructor({ receiver, message, arg }) {
+  constructor({ receiver, message, arg = null }) {
     this._receiver = receiver;
     this._message = message;
     this._arg = arg;
@@ -154,13 +158,23 @@ declare global {
 }
 
 String.prototype.parse = function() {
-
+  let parser = new Parser(this);
+  return parser.expr();
 }
 
-export class ClassRef {
+export class Ref {
   _sym: OpSym;
 
   constructor(sym) {
     this._sym = sym;
   }
+}
+
+export class ClassRef extends Ref {
+}
+export class InterfaceRef extends Ref {
+}
+export class ApplyRef extends Ref {
+}
+export class VauRef extends Ref {
 }

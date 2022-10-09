@@ -1,4 +1,4 @@
-import { Arg, ClassRef, Lexer, OpSym, Parser, SendExpression } from './svoperat';
+import { ApplyRef, Arg, ClassRef, InterfaceRef, Lexer, OpSym, Parser, SendExpression, VauRef } from './svoperat';
 
 describe('parser', () => {
   test('gensym', () => {
@@ -6,22 +6,22 @@ describe('parser', () => {
     expect(sym).toEqual(new OpSym('test'));
   })
   test('tokenize unit message', () => {
-    const code = '2.+(3)';
+    const code = '2:+(3)';
     let lex = new Lexer(code);
-    expect(lex.tokenize()).toEqual([2, '.', new OpSym('+'), '(', 3, ')']);
+    expect(lex.tokenize()).toEqual(['2', ':', '+', '(', '3', ')']);
   })
   test('tokenize map message', () => {
-    const code = '.shift{ :by(5) :direction(left) }'
+    const code = ':shift{ :by(5) :direction(left) }'
     let lex = new Lexer(code);
-    expect(lex.tokenize()).toEqual(['.', new OpSym('shift'), '{', new OpSym('by'), ':', 5, new OpSym('direction'), ':', new OpSym('left'), '}']);
+    expect(lex.tokenize()).toEqual(['shift', '{', ':', 'by', '5', ':', 'direction', 'left', '}']);
   })
   test('tokenize variables', () => {
-    const code = '~test.new{:gt(%it)}'
+    const code = '~test:new{:gt(@)}'
     let lex = new Lexer(code);
-    expect(lex.tokenize()).toEqual(['~', new OpSym('test'), '.', new OpSym('new'), '{', ':', new OpSym('gt'), '(', '%', new OpSym('it'), ')', '}']);
+    expect(lex.tokenize()).toEqual(['~', 'test', ':', 'new', '{', ':', 'gt', '(', '@', ')', '}']);
   })
   test('parse unit message', () => {
-    const code = '2.+(3)';
+    const code = '2:+(3)';
     let parser = new Parser(code);
 
     let expr = parser.expr();
@@ -37,9 +37,6 @@ describe('parser', () => {
   })
   test('parse @ arg', () => {
   })
-  test('', () => {
-  })
-
   test('string', () => {
     expect('"hello world"'.parse()).toEqual('hello world')
   })
@@ -53,11 +50,26 @@ describe('parser', () => {
     expect('@'.parse()).toEqual(Arg)
   })
   test('class', () => {
-    expect('~http-request').toEqual(new ClassRef(new OpSym('http-request')))
+    expect('~http-request'.parse()).toEqual(new ClassRef(new OpSym('http-request')))
   })
-  test('interface', () => {})
-  test('boolean', () => {})
-  test('message', () => {})
+  test('interface', () => {
+    expect('!container'.parse()).toEqual(new InterfaceRef(new OpSym('container')))
+  })
+  test('boolean', () => {
+    expect('#true'.parse()).toEqual(true)
+  })
+  test('apply', () => {
+    expect(':test'.parse()).toEqual(new ApplyRef(new OpSym('test')))
+  })
+  test('vau', () => {
+    expect('$test'.parse()).toEqual(new VauRef(new OpSym('test')))
+  })
+  test('list', () => {
+    expect('[1 2 3]'.parse()).toEqual([1, 2, 3])
+  })
+  test('message', () => {
+    expect('5:sqrt'.parse()).toEqual(new SendExpression({ receiver: 5, message: new ApplyRef(new OpSym('sqrt')) }))
+  })
   test('map', () => {})
   test('value', () => {})
   test('list', () => {})

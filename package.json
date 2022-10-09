@@ -5,7 +5,7 @@
   "main": "lisp.js",
   "type": "module",
   "scripts": {
-    "test": "jest",
+    "test": "jest --bail=1",
     "watch": "jest --testTimeout 1000 --watch"
   },
   "author": "",
